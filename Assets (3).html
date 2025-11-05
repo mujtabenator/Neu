@@ -1,0 +1,3008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Equipment Maintenance Web App</title>
+
+  <!-- External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js removed (you said no charts) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+
+  <!-- Icons & Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    /* ========= THEME ========= */
+    :root{
+      --sidebar-width: 300px;
+      --sidebar-bg: linear-gradient(180deg,#0f172a,#1e293b);
+      --sidebar-text:#e6eef8;
+      --main-bg:   linear-gradient(180deg,#f8fafc,#eef2ff);
+      --border-color: rgba(15,23,42,0.08);
+      --accent-color:#2563eb; /* light blue */
+      --muted:#64748b;
+      --radius:10px;
+      --card-shadow: 0 6px 18px rgba(16,24,40,0.06);
+      --ok:#16a34a;      /* green */
+      --soon:#ec4899;    /* pink */
+      --late:#dc2626;    /* red */
+      --chip:#e2e8f0;    /* light gray chip bg */
+    }
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      color:#0f172a;
+      background:var(--main-bg);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* ========= LAYOUT ========= */
+    .wrapper{
+      display:flex;
+      height:100vh;
+      overflow:hidden;
+      position:relative;
+    }
+    .sidebar{
+      flex:0 0 var(--sidebar-width);
+      width:var(--sidebar-width);
+      background:var(--sidebar-bg);
+      color:var(--sidebar-text);
+      display:flex;
+      flex-direction:column;
+      padding:1rem;
+      gap:.75rem;
+      overflow-y:auto;
+      border-top-right-radius:var(--radius);
+      border-bottom-right-radius:var(--radius);
+      box-shadow:var(--card-shadow);
+    }
+    #tree{ margin-top:.25rem; background:rgba(255,255,255,0.02); border-radius:6px; padding:.5rem; max-height:46vh; overflow:auto; }
+    .main{ flex-grow:1; display:flex; flex-direction:column; overflow:auto; min-width:0; }
+    .tabs{ border-bottom:1px solid var(--border-color); }
+    .tab-content{ padding:1.25rem; min-width:0; }
+    .tab-pane{ min-width:0; }
+    .map-container{ height:400px; }
+    .stat-card{
+      background:#fff; padding:12px; border-radius:10px; box-shadow:var(--card-shadow);
+      color:#111827; min-height:60px;
+    }
+    .kpi-table{ width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:var(--card-shadow); }
+    .kpi-table th,.kpi-table td{ padding:8px 10px; border-bottom:1px solid rgba(15,23,42,0.06); font-size:.95rem; color:#111827; }
+    .kpi-table th{ background:#f8fafc; font-weight:600; }
+    .kpi-small{ font-weight:700; font-size:1rem; }
+    .stat-title{ font-size:.9rem; color:#64748b; }
+    .stat-value{ font-size:1.25rem; font-weight:700; color:var(--accent-color); }
+    .details-customer-name{ color:#f59e0b; font-weight:700; font-size:1.05rem; }
+
+  /* ---- Compact KPI table ---- */
+  .kpi-table-compact { font-size: .9rem; }
+  .kpi-table-compact th, .kpi-table-compact td { padding: 6px 8px; }
+  .kpi-table-compact .kpi-small { font-size: 0.95rem; font-weight: 700; }
+
+  /* ---- Modern tiles & grids for Stats ---- */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .tile { background: #fff; border: 1px solid rgba(15,23,42,.08); border-radius: 12px; padding: 12px; box-shadow: var(--card-shadow); }
+  .tile h6 { margin: 0 0 8px 0; font-size: .95rem; color: #0f172a; }
+  .tile .pair { display:flex; justify-content:space-between; font-size:.9rem; padding:4px 0; border-bottom:1px dashed rgba(15,23,42,.06); }
+  .tile .pair:last-child { border-bottom:0; }
+  .badge-soft { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; font-size:.78rem; color:#1e293b; }
+  .stat-card { border-radius:12px; box-shadow:var(--card-shadow); border:1px solid rgba(15,23,42,.06); }
+  .card .accent { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(37,99,235,.08); color:#2563eb; font-weight:600; font-size:.75rem; }
+
+    /* ========= DETAILS GRID ========= */
+    #tab-details, #tab-details #detailsPanel { font-size:.74rem; }
+    .details-row{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:1rem; }
+    .details-col{ width:100%; box-sizing:border-box; background:#fff; border:1px solid rgba(15,23,42,0.06); border-radius:8px; padding:8px; box-shadow:0 4px 10px rgba(16,24,40,0.03); height:231.28px; overflow:auto; min-width:0; }
+    .details-remarks{ margin-top:10px; border:1px dashed rgba(15,23,42,0.08); padding:8px; border-radius:8px; background:#fff; grid-column:1 / -1; }
+    .tank-table{ width:100%; table-layout:fixed; border-collapse:collapse; font-size:.96em; background:transparent; }
+    .tank-table th,.tank-table td{ min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:normal; word-break:break-word; overflow-wrap:anywhere; }
+    .tank-table .tank-table-label{ text-align:left; color:#334155; font-weight:600; padding-right:8px; white-space:normal; }
+    .tank-table .tank-table-value{ text-align:right; color:#0f172a; }
+    @media (max-width:900px){ .details-row{ grid-template-columns:1fr; gap:10px; grid-auto-rows:auto; } .details-col{ height:auto; } }
+
+    /* ========= RESIZER ========= */
+    .resizer{
+      width:12px; cursor:ew-resize; background:rgba(15,23,42,0.06);
+      position:absolute; left:calc(var(--sidebar-width) - 6px); top:0; bottom:0; height:auto; margin:0;
+      z-index:9999; pointer-events:auto; touch-action:none; transition:background .12s ease;
+      box-shadow:0 0 0 1px rgba(0,0,0,0.02) inset;
+    }
+    .resizer:hover{ background:rgba(15,23,42,0.12); }
+    body.show-resizer-outline .resizer{ outline:2px solid rgba(99,102,241,0.6); }
+
+    /* ========= PLANNER ========= */
+    .planner-toolbar{
+      display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; background:#fff;
+      border:1px solid var(--border-color); border-radius:10px; padding:12px; box-shadow:var(--card-shadow);
+    }
+    .planner-toolbar label{ font-size:.8rem; color:#475569; margin-bottom:4px; }
+    .planner-toolbar .form-select, .planner-toolbar .form-control{ min-width:180px; }
+    /* Column resizer for Planner table */
+    .planner-table th{ position:relative; }
+    .planner-col-resizer{
+      position:absolute; right:0; top:0; width:6px; height:100%;
+      cursor:col-resize; user-select:none;
+    }
+    .legend-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+    .dot-red{ background:var(--late); } .dot-pink{ background:var(--soon); } .dot-green{ background:var(--ok); }
+    .planner-summary{ display:flex; gap:12px; flex-wrap:wrap; margin:10px 0; }
+    .chip{ background:var(--chip); border-radius:999px; padding:6px 10px; font-size:.85rem; }
+    .chip b{ margin-left:6px; }
+    .planner-table .status-pill{
+      display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:2px 8px; font-size:.78rem; color:#0f172a; background:#f1f5f9;
+    }
+    .pill-red{ background:#fee2e2; } .pill-pink{ background:#fce7f3; } .pill-green{ background:#dcfce7; }
+    .row-red   { background: #fff5f5; }
+    .row-pink  { background: #fff0f7; }
+    .row-green { background: #f2fff6; }
+    /* ===== PDF-friendly overrides for Statistics export ===== */
+    .pdf-friendly {
+      background:#fff !important; color:#111827 !important; padding:8px 0;
+      font-family:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    }
+    .pdf-friendly * { color:#111827 !important; }
+    .pdf-friendly .card,
+    .pdf-friendly .stat-card,
+    .pdf-friendly .tile {
+      box-shadow: none !important;
+      border: 1px solid #e5e7eb !important;
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .pdf-friendly .badge-soft { background:#f3f4f6 !important; color:#111827 !important; }
+    .pdf-friendly h4, .pdf-friendly h5, .pdf-friendly h6 { margin: 0 0 6px 0; }
+    .pdf-friendly .row { margin:0; }
+    .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+    .page-break { break-before: page; page-break-before: always; }
+    /* === PDF EXPORT TWEAKS (compact, readable A4) === */
+    .pdf-export{
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .pdf-export h5{ font-size: 13px; margin: 2px 0 6px; }
+    .pdf-export h6{ font-size: 12px; margin: 2px 0 6px; }
+    .pdf-export .stat-title{ font-size: 0.85rem; }
+    .pdf-export .stat-value{ font-size: 14px; }
+    .pdf-export .kpi-table,
+    .pdf-export .kpi-table-compact{ font-size: 10px; }
+    .pdf-export .kpi-table th,
+    .pdf-export .kpi-table td{ padding: 4px 6px; }
+    .pdf-export .tile .pair{ padding: 2px 0; font-size: 10px; }
+
+    /* prevent ugly splits across page slices */
+    .pdf-export .card,
+    .pdf-export .stat-card,
+    .pdf-export .tile,
+    .pdf-export table{
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* === PDF ULTRA-COMPACT (scoped to stats only) === */
+    .pdf-export {
+      font-size: 9.5px;
+      line-height: 1.35;
+    }
+    .pdf-export h5 { font-size: 12px; margin: 2px 0 6px; }
+    .pdf-export h6 { font-size: 11px; margin: 2px 0 6px; }
+
+    .pdf-export #statsPanel .card,
+    .pdf-export #statsPanel .stat-card,
+    .pdf-export #statsPanel .tile {
+      padding: 8px !important;
+      border-radius: 8px;
+      box-shadow: none;
+      border: 1px solid rgba(15,23,42,.08);
+    }
+
+    /* tighter tables */
+    .pdf-export .kpi-table,
+    .pdf-export .kpi-table-compact { font-size: 9.5px; }
+    .pdf-export .kpi-table th,
+    .pdf-export .kpi-table td { padding: 4px 6px; }
+
+    /* pack rows into grid to reduce height */
+    .pdf-export #statsPanel .row {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 8px;
+      margin: 0;        /* suppress big bootstrap gutters for PDF */
+    }
+
+    /* avoid ugly splits */
+    .pdf-export #statsPanel .card,
+    .pdf-export #statsPanel .stat-card,
+    .pdf-export #statsPanel .tile,
+    .pdf-export #statsPanel table {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Modal -->
+  <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-login p-3" style="background:linear-gradient(180deg,#0b1220,#0f172a); color:#e6eef8;">
+        <div class="modal-body">
+          <h4 id="loginModalLabel" class="mb-3">SOS Login</h4>
+          <div class="mb-2" style="color:#94a3b8;">Enter credentials to continue</div>
+          <input type="text" id="username" class="form-control mb-2" placeholder="Username" aria-label="Username" />
+          <input type="password" id="password" class="form-control mb-3" placeholder="Password" aria-label="Password" />
+          <button id="loginBtn" class="btn btn-primary w-100">Login</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrapper">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="m-0">Data Loader</h4>
+        <button id="headerLogBtn" class="btn btn-sm btn-outline-light" title="View logs"><i class="fa fa-list"></i></button>
+      </div>
+      <input type="file" id="fileInput" accept=".xls,.xlsx" />
+      <button class="btn btn-primary btn-sm mb-3" id="uploadBtn">Upload &amp; Parse</button>
+      <div class="search mb-2">
+        <input type="text" id="treeSearch" class="form-control form-control-sm" placeholder="Search..." />
+      </div>
+      <div id="tree"></div>
+    </div>
+
+    <!-- Resizer -->
+    <div class="resizer" id="resizer"></div>
+
+    <!-- Main -->
+    <div class="main">
+      <ul class="nav nav-tabs tabs" id="appTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" id="map-tab" data-bs-toggle="tab" data-bs-target="#tab-map" type="button" role="tab">Map</button></li>
+        <li class="nav-item"><button class="nav-link" id="maint-tab" data-bs-toggle="tab" data-bs-target="#tab-maint" type="button" role="tab">Maintenance</button></li>
+
+        <!-- NEW: Planner -->
+        <li class="nav-item"><button class="nav-link" id="planner-tab" data-bs-toggle="tab" data-bs-target="#tab-planner" type="button" role="tab">Planner</button></li>
+
+        <li class="nav-item"><button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#tab-details" type="button" role="tab">Details</button></li>
+        <li class="nav-item"><button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#tab-stats" type="button" role="tab">Statistics</button></li>
+        <li class="nav-item"><button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#tab-reports" type="button" role="tab">Reports</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- Map -->
+        <div class="tab-pane fade show active" id="tab-map" role="tabpanel">
+          <h5 class="mt-3">Customer Map</h5>
+          <div id="customerMap" class="map-container"></div>
+        </div>
+
+        <!-- Maintenance -->
+        <div class="tab-pane fade" id="tab-maint" role="tabpanel">
+          <h5 class="mt-3">Maintenance Schedule</h5>
+          <div id="maintenanceMap" class="map-container"></div>
+          <div id="maintenanceTable" class="table-responsive mt-3"></div>
+        </div>
+
+        <!-- NEW: Planner -->
+        <div class="tab-pane fade" id="tab-planner" role="tabpanel">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mt-3">Planner</h5>
+            <div class="d-flex align-items-center">
+              <div class="small text-muted mt-3 me-2">
+              <span class="legend-dot dot-red"></span>Overdue&nbsp;
+              <span class="legend-dot dot-pink"></span>Next 0–3 months&nbsp;
+              <span class="legend-dot dot-green"></span>> 3 months
+              </div>
+              <button id="exportPlannerBtn" class="btn btn-outline-secondary btn-sm ms-2">Export PDF</button>
+              <button id="exportPlannerExcelBtn" class="btn btn-outline-success btn-sm ms-2">Export Excel</button>
+            </div>
+          </div>
+
+          <div class="planner-toolbar mt-2">
+            <div>
+              <label>From (month)</label>
+              <input type="month" id="pl-from" class="form-control form-control-sm" />
+            </div>
+            <div>
+              <label>To (month)</label>
+              <input type="month" id="pl-to" class="form-control form-control-sm" />
+            </div>
+            <div>
+              <label>Object Types</label>
+              <select id="pl-types" class="form-select form-select-sm" multiple size="8" style="min-width:200px">
+                <option value="tanks" selected>Tanks</option>
+                <option value="verdampfer" selected>Verdampfer</option>
+                <option value="gasmischer" selected>Gasmischer</option>
+                <option value="pufferbehalter" selected>Pufferbehälter</option>
+                <option value="froster" selected>Froster</option>
+                <option value="co2" selected>CO₂</option>
+                <option value="tafel" selected>Tafel</option>
+                <option value="spezial" selected>Spezial</option>
+                <option value="telemetry">Telemetry</option>
+                <option value="sv" selected>SV</option>
+              </select>
+            </div>
+            <div>
+              <label>Wartungsart</label>
+              <select id="pl-jobs" class="form-select form-select-sm" multiple size="8" style="min-width:200px">
+                <option value="Wartung" selected>Wartung</option>
+                <option value="Analyse" selected>Analyse</option>
+                <option value="wkP Anlage" selected>wkP Anlage</option>
+                <option value="wkP Innere" selected>wkP Innere</option>
+                <option value="wkP Festigkeit" selected>wkP Festigkeit</option>
+                <option value="Äußere Prüfung" selected>Äußere Prüfung</option>
+                <option value="Elektro-Prüfung" selected>Elektro-Prüfung</option>
+                <option value="LTPP" selected>LTPP</option>
+                <option value="Next Change">SV: Next Change</option>
+              </select>
+            </div>
+            <div>
+              <label>Region</label>
+              <select id="pl-regions" class="form-select form-select-sm" multiple size="8" style="min-width:200px">
+                <!-- filled dynamically -->
+              </select>
+            </div>
+            <div>
+              <label>Technicians</label>
+              <select id="pl-techs" class="form-select form-select-sm" multiple size="8" style="min-width:180px">
+                <!-- filled dynamically -->
+              </select>
+            </div>
+            <div class="form-check" style="min-width:160px">
+              <input class="form-check-input" type="checkbox" id="pl-overdue-only">
+              <label class="form-check-label" for="pl-overdue-only">Overdue only</label>
+            </div>
+            <div class="ms-auto d-flex gap-2">
+              <button id="pl-clear" class="btn btn-outline-secondary btn-sm">Clear</button>
+              <button id="pl-today" class="btn btn-primary btn-sm">This Quarter</button>
+            </div>
+          </div>
+
+          <!-- Installer toggle + sort controls -->
+          <div class="planner-toolbar mt-2">
+            <div>
+              <label>Installations</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="pl-installations-only">
+                <label class="form-check-label" for="pl-installations-only">Show installations only</label>
+              </div>
+            </div>
+
+            <div>
+              <label>Sort by</label>
+              <select id="pl-sort-key" class="form-select form-select-sm">
+                <option value="dueDate">Date</option>
+                <option value="regionName">Region</option>
+                <option value="customerCode">Customer Code</option>
+                <option value="tankInv">Tank Inv Number</option>
+                <option value="technicianName">Technician</option>
+                <option value="jobType">Wartungsart</option>
+                <option value="label">Object</option>
+              </select>
+            </div>
+            <div>
+              <label>Order</label>
+              <select id="pl-sort-dir" class="form-select form-select-sm">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+            <div style="min-width:180px">
+              <label>Views</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="pl-bundled-visits">
+                <label class="form-check-label" for="pl-bundled-visits">Bundled Visits</label>
+              </div>
+            </div>
+            <div style="min-width:180px">
+              <label>Routing / Assignment</label>
+              <div class="d-flex flex-column">
+                <button id="pl-suggest-route" class="btn btn-outline-primary btn-sm mb-1">Suggest route</button>
+                <button id="pl-suggest-assign" class="btn btn-outline-success btn-sm">Suggest assignments</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="planner-summary" id="pl-summary"></div>
+
+          <div id="plannerMap" class="map-container mt-2"></div>
+
+          <div class="table-responsive mt-3 planner-table" id="plannerTable"></div>
+        </div>
+
+        <!-- Details -->
+        <div class="tab-pane fade" id="tab-details" role="tabpanel">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mt-3">Details</h5>
+            <div>
+              <button id="exportDetailsBtn" class="btn btn-outline-secondary btn-sm mt-3">Export PDF</button>
+            </div>
+          </div>
+          <div id="detailsPanel" style="padding-top:8px;">
+            <div class="text-muted">Select a customer in the tree or click Details on a map popup to view details.</div>
+          </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="tab-pane fade" id="tab-stats" role="tabpanel">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mt-3">Statistics</h5>
+            <button class="btn btn-outline-secondary btn-sm mt-3" id="exportStatsBtn">Export Stats PDF</button>
+          </div>
+          <div id="statsPanel">
+            <div id="kpiRow" class="d-flex gap-3 p-3" style="align-items:center;flex-wrap:wrap"></div>
+            <div id="globalSummary" class="p-2 mb-2" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+            <div id="detailStats" class="mt-2"></div>
+
+            <div class="row mt-3">
+              <div class="col-md-6">
+                <div class="card p-3 mb-3">
+                  <h6 class="mb-2">Equipment Breakdown (per group)</h6>
+                  <div id="groupStats" class="small-muted"></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card p-3 mb-3">
+                  <h6 class="mb-2">Top 10 Cities (by customers)</h6>
+                  <div id="topCities" class="small-muted"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row mt-2">
+              <div class="col-12">
+                <div class="card p-3">
+                  <h6 class="mb-2">Totals by Equipment Group</h6>
+                  <div id="totalsByType" class="small-muted"></div>
+                </div>
+              </div>
+            </div>
+            <div class="row mt-2">
+              <div class="col-12">
+                <div class="card p-3">
+                  <h6 class="mb-2">Pool Preview (first items)</h6>
+                  <div id="poolPreview" class="small-muted" style="max-height:220px;overflow:auto;font-size:0.9rem"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reports -->
+        <div class="tab-pane fade" id="tab-reports" role="tabpanel">
+          <h5 class="mt-3">Reports</h5>
+          <button class="btn btn-secondary btn-sm" id="generatePdfBtn">Generate PDF Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ====================== STATE & CONSTANTS ====================== */
+let appData = {};
+let customerMap, maintenanceMap, plannerMap;
+let treeInstance;
+let isLoggedIn = false;
+let logEntries = [];
+
+// ===== Stable selection state (prevents unnecessary re-renders) =====
+let currentTreeSelectionKey = '';       // for Map + Maintenance (tree-driven)
+let currentMaintenanceSelectionKey = '';
+let customerMarkersGroup = null;        // LayerGroup for Map
+let maintenanceMarkersGroup = null;     // LayerGroup for Maintenance
+
+function selectionKey(ids){
+  if(!Array.isArray(ids)) return '';
+  return ids.slice().map(String).sort().join(',');
+}
+
+function fitBoundsIfAny(map, group){
+  try{
+    if(group && group.getLayers().length){
+      map.fitBounds(group.getBounds().pad(0.5));
+    }
+  }catch(e){}
+}
+
+const COLUMN_HEADERS = {
+  Customers: {
+    id:'Customer_Node_ID',
+    display:'Display',
+    name:'Name',
+    street:'Street',
+    house:'Hause_Number',
+    zip:'Zip',
+    city:'City',
+    code:'Code',
+    alphabet:'Alphabet_Node_ID',
+    parent:'Parent_Node_ID',
+    latitude:'Latitude',        // <— add
+    longitude:'Longitude'       // <— add
+  },
+  Tanks: {
+    id:'Tank_Node_ID',
+    customer:'Customer_Node_ID',
+    equipment_number:'Equipment_Number',
+    inventory:'Inventory_Number',
+    product:'Product_Number',
+    type:'Type',
+    name:'Name',
+    fabrikat:'Fabrikat_Number',
+    gasart:'Gasart',
+    hersteller:'Hersteller',
+    baujahr:'Baujahr',
+    bezeichnung:'Bezeichnung',
+    geometr:'Geometr_Behalterinhalt',
+    zul:'Zul_Betriebsdruck',
+    arbeitsdruck:'Arbeitsdruck',
+    messbereich:'Messbereich',
+    full_ende:'Full_Ende',
+    max_full:'Max_Fullstand',
+    datum_aufstellung:'Datum Aufstellung',
+    analyse:'Analyse',
+    aussere:'Aussere_Prufung',
+    elektro:'Elektro_Prufung',
+    wartung:'Wartung',
+    wkP_Anlage:'wkP_Anlage',
+    wkP_Festigkeit:'wkP_Festigkeit',
+    wkP_Innere:'wkP_Innere',
+    ltpp:'LTPP',
+    // Tanks do NOT have authoritative lat/lon – we will inherit from customer
+    latitude:'Latitude',
+    longitude:'Longitude',
+    technician:'TechnicianID',           // optional / legacy
+    technician_name:'Technician Name',   // NEW
+    bemerkungen:'Bemerkungen'
+  },
+  Verdampfer: { id:'Verdampfer_Node_ID', tank:'Tank_Node_ID', equipment_number:'Equipment_Number', inventory:'Inventory_Number', gasart:'Gasart', product:'Product_Number', type:'Type', geometr:'Geometr_Behalterinhalt', zul:'Zul_Betriebsdruck', arbeitsdruck:'Arbeitsdruck', hersteller:'Hersteller', baujahr:'Baujahr', datum_aufstellung:'Datum Aufstellung', analyse:'Analyse', aussere:'Aussere_Prufung', elektro:'Elektro_Prufung', wartung:'Wartung', wkP_Anlage:'wkP_Anlage', wkP_Festigkeit:'wkP_Festigkeit', wkP_Innere:'wkP_Innere', name:'Name', fabrikat:'Fabrikat_Number', bezeichnung:'Bezeichnung' },
+  Gasmischer: { id:'Gasmischer_Node_ID', tank:'Tank_Node_ID', equipment_number:'Equipment_Number', inventory:'Inventory_Number', type:'Type', gasart:'Gasart', hersteller:'Hersteller', baujahr:'Baujahr', datum_aufstellung:'Datum Aufstellung', analyse:'Analyse', aussere:'Aussere_Prufung', elektro:'Elektro_Prufung', wartung:'Wartung', wkP_Anlage:'wkP_Anlage', wkP_Festigkeit:'wkP_Festigkeit', wkP_Innere:'wkP_Innere', bezeichnung:'Bezeichnung', name:'Name', fabrikat:'Fabrikat_Number', bemerkungen:'Bemerkungen' },
+  Pufferbehalter: { id:'Pufferbehalter_Node_ID', gasmischer:'Gasmischer_Node_ID', equipment_number:'Equipment_Number', inventory:'Inventory_Number', bezeichnung:'Bezeichnung', type:'Type', gasart:'Gasart', geometr:'Geometr_Behalterinhalt', zul:'Zul_Betriebsdruck', arbeitsdruck:'Arbeitsdruck', hersteller:'Hersteller', baujahr:'Baujahr', datum_aufstellung:'Datum Aufstellung', analyse:'Analyse', aussere:'Aussere_Prufung', elektro:'Elektro_Prufung', wartung:'Wartung', wkP_Anlage:'wkP_Anlage', wkP_Festigkeit:'wkP_Festigkeit', wkP_Innere:'wkP_Innere', name:'Name', fabrikat:'Fabrikat_Nummer' },
+  Froster: { id:'Froster_ID', tank:'Tank_Node_ID', equipment_number:'Equipment_Number', inventory:'Inventory_Number', bezeichnung:'Bezeichnung', type:'Type', gasart:'Gasart', product:'Product_Number', hersteller:'Hersteller', baujahr:'Baujahr', datum_aufstellung:'Datum Aufstellung', analyse:'Analyse', aussere:'Aussere_Prufung', elektro:'Elektro_Prufung', wartung:'Wartung', wkP_Anlage:'wkP_Anlage', wkP_Festigkeit:'wkP_Festigkeit', wkP_Innere:'wkP_Innere', name:'Name', fabrikat:'Fabrikat_Number' },
+  CO2: { id:'Kaltmaschine_Node_ID', tank:'Tank_Node_ID', equipment_number:'Equipment_Number', inventory:'Inventory_Number', bezeichnung:'Bezeichnung', type:'Type', gasart:'Gasart', product:'Product_Number', hersteller:'Hersteller', baujahr:'Baujahr', datum_aufstellung:'Datum Aufstellung', analyse:'Analyse', aussere:'Aussere_Prufung', elektro:'Elektro_Prufung', wartung:'Wartung', wkP_Anlage:'wkP_Anlage', wkP_Festigkeit:'wkP_Festigkeit', wkP_Innere:'wkP_Innere', name:'Name', fabrikat:'Fabrikat_Number' },
+  Spezial: { id:'Spezial_Node_ID', tank:'TANK_Node_Id', equipment_number:'Equipment_Number', inventory:'Inventory_Number', type:'Type', name:'Name', fabrikat:'Fabrikat_Number' },
+  Tafel: { id:'Tafel_Node_ID', tank:'Tank_Node_ID', equipment_number:'Equipment_Number', inventory:'Inventory_Number', bezeichnung:'Bezeichnung', name:'Name', fabrikat:'Fabrikat_Number' },
+  SV: {
+    id: 'SV_Node_ID',
+    parent: 'Parent_Node_ID',          // unified parent field
+    p_id: 'P_ID_Number',
+    type: 'Type',
+    fabrikat: 'Fabrikat_Number',
+    tuv: 'TUV_SV_Number',
+    pressure: 'Pressure',
+    last_checked: 'Date_Last_Checked',
+    manufacturer: 'Manufacturer',
+    pressure_setting: 'PressureSetting',
+    installation: 'Date Installed',    // exact header
+    next_change: 'Next Change Date'    // exact header
+  },
+  Telemetry: { id:'Telemetry_Node_ID', tank:'Tank_Node_Id', type:'Type', name:'Name', timestamp:'TimeStamp', fill:'Fill_Level', pressure:'Pressure' },
+  Technicians: { id:'TechnicianID', name:'Technician Name', address:'Address', email:'Email' }
+};
+
+/* ====================== LOGIN MODAL ====================== */
+document.addEventListener('DOMContentLoaded', () => {
+  try{
+    const loginModalEl = document.getElementById('loginModal');
+    const loginModal = new bootstrap.Modal(loginModalEl, { backdrop:'static', keyboard:false });
+    loginModal.show();
+    setTimeout(()=> document.getElementById('username').focus(), 300);
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
+      if (user && pass){ isLoggedIn = true; loginModal.hide(); }
+      else{
+        document.getElementById('username').classList.add('is-invalid');
+        setTimeout(()=> document.getElementById('username').classList.remove('is-invalid'), 1000);
+      }
+    });
+  }catch(e){}
+});
+
+/* ====================== LOGGING MODAL ====================== */
+function log(message){
+  logEntries.push({ ts:new Date(), text:message });
+  const countEl = document.getElementById('logCount');
+  if (countEl) countEl.textContent = `${logEntries.length} entries`;
+}
+function showLogModal(autoHideMs){
+  const id='logModal';
+  let el=document.getElementById(id);
+  if(!el){
+    document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal fade" id="${id}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header"><h5 class="modal-title">Upload Log</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body"><div id="logList" style="max-height:60vh;overflow:auto;"></div></div>
+        </div>
+      </div>
+    </div>`);
+    el=document.getElementById(id);
+  }
+  const list=el.querySelector('#logList'); list.innerHTML='';
+  logEntries.forEach((e)=>{ const d=document.createElement('div'); d.innerHTML=`<div><strong>${e.ts.toLocaleString()}</strong> — ${e.text}</div>`; list.appendChild(d); });
+  const bs=new bootstrap.Modal(el); bs.show();
+  if(autoHideMs>0) setTimeout(()=> bs.hide(), autoHideMs);
+}
+document.addEventListener('click', (ev)=>{ if(ev.target && (ev.target.id==='headerLogBtn' || ev.target.closest?.('#headerLogBtn'))) showLogModal(0); });
+
+/* ====================== FILE UPLOAD ====================== */
+document.getElementById('uploadBtn').addEventListener('click', ()=>{
+  const file=document.getElementById('fileInput').files[0];
+  if(!file) return alert('Please select an Excel file.');
+  log('Uploading file...'); parseExcelFile(file);
+});
+
+function parseExcelFile(file){
+  const reader=new FileReader();
+  reader.onload=(evt)=>{
+    const data=new Uint8Array(evt.target.result);
+    const workbook=XLSX.read(data,{ type:'array' });
+    const sheetsNeeded=['Country','Region','Alphabets','Customers','Customers_Sub','Customers_Sub_Sub','Tanks','Verdampfer','Gasmischer','Pufferbehalter','Froster','CO2_Kaltemaschine','Tafel','Spezial ','Telemetry','SV','Technicians'];
+    const sheetJson={};
+    sheetsNeeded.forEach((name)=>{
+      const matched = workbook.SheetNames.find(sn => sn.trim() === name.trim());
+      if (!matched) return;
+
+      const worksheet = workbook.Sheets[matched];
+
+      if (name.trim() === 'Telemetry') {
+        // Get raw (dates/numbers intact) AND formatted (leading zeros kept)
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: null, raw: true });
+        const fmtRows = XLSX.utils.sheet_to_json(worksheet, { defval: null, raw: false });
+
+        // Merge by Telemetry_Node_ID to preserve formatted Name/Type
+        const fmtMap = new Map(fmtRows.map(r => [String(r['Telemetry_Node_ID']), r]));
+        const merged = rawRows.map(r => {
+          const key = String(r['Telemetry_Node_ID']);
+          const f = fmtMap.get(key) || {};
+          // Prefer formatted text for Name/Type (keeps leading zeros like "0403")
+          if (f.Name != null) r.Name = f.Name;
+          if (f.Type != null) r.Type = f.Type;
+          return r;
+        });
+
+        sheetJson[name.trim()] = merged;
+      } else {
+        sheetJson[name.trim()] = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+      }
+    });
+    const missing=sheetsNeeded.filter(sn=> !workbook.SheetNames.some(n=> n.trim()===sn.trim()));
+    if(missing.length) alert('Missing sheets: '+missing.join(', '));
+
+    appData = buildDataStructure(sheetJson);
+
+    log('File parsed successfully.');
+    log(`Sheets loaded: ${Object.keys(sheetJson).join(', ')}`);
+    log(`Customers with tanks: ${Object.keys(appData.tanks).length}`);
+    log(`Verdampfer: ${appData.counts.verdampfer||0}, Gasmischer: ${appData.counts.gasmischer||0}, Pufferbehalter: ${appData.counts.pufferbehalter||0}, Froster: ${appData.counts.froster||0}, CO₂: ${appData.counts.co2||0}, Tafel: ${appData.counts.tafel||0}, Spezial: ${appData.counts.spezial||0}, Telemetry: ${appData.counts.telemetry||0}, SV: ${appData.counts.sv||0}`);
+
+    try{
+      const getLen=(n)=> (sheetJson[n]? sheetJson[n].length:0);
+      log(`Raw rows by sheet: Country:${getLen('Country')}, Region:${getLen('Region')}, Alphabets:${getLen('Alphabets')}, Customers:${getLen('Customers')}, Customers_Sub:${getLen('Customers_Sub')}, Customers_Sub_Sub:${getLen('Customers_Sub_Sub')}, Tanks:${getLen('Tanks')}, Technicians:${getLen('Technicians')}`);
+      log(`Equipment sheet rows: Verdampfer:${getLen('Verdampfer')}, Gasmischer:${getLen('Gasmischer')}, Pufferbehalter:${getLen('Pufferbehalter')}, Froster:${getLen('Froster')}, CO2_Kaltemaschine:${getLen('CO2_Kaltemaschine')}, Tafel:${getLen('Tafel')}, Spezial:${getLen('Spezial')||getLen('Spezial ')}, Telemetry:${getLen('Telemetry')}, SV:${getLen('SV')}`);
+      log(`Parsed counts: Countries:${(sheetJson['Country']||[]).length}, Regions:${(sheetJson['Region']||[]).length}, Alphabets:${(sheetJson['Alphabets']||[]).length}`);
+      log(`Parsed customers: Master:${getLen('Customers')}, Sub:${getLen('Customers_Sub')}, SubSub:${getLen('Customers_Sub_Sub')}`);
+      log(`Parsed tanks (from structure): ${appData.totals ? (appData.totals.tanks || 0) : Object.values(appData.tanks || {}).reduce((s,l)=>s+l.length,0)}`);
+      log(`Technicians (parsed): ${(appData.technicians||[]).length}`);
+      log(`Pool counts (orphans): ${Object.keys(appData.pool||{}).map(k=> `${k}:${(appData.pool[k]||[]).length}`).join(', ')}`);
+    }catch(e){}
+
+    initTree(); initMaps(); initStatistics();
+    // Initial full selection once (all customers that have tanks)
+    try{
+      const allCustomerIds = Object.keys(appData.tanks || {});
+      updateCustomerMap(allCustomerIds);
+      updateMaintenance(allCustomerIds);
+    }catch(e){}
+    try{ setTimeout(()=> alignResizerToSidebar(), 120); }catch(e){}
+  showLogModal(2000);
+    try{ setTimeout(()=> alignResizerToSidebar(), 220); }catch(e){}
+
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ====================== DATA BUILD ====================== */
+// --- helpers: parse Latitude/Longitude that are stored as text (e.g. "50,123" or "50.123") ---
+function parseLatLon(v){
+  if (v == null) return null;
+  if (typeof v === 'number' && isFinite(v)) return v;
+  if (typeof v === 'string'){
+    let s = v.trim();
+    // replace German comma decimal with dot and strip everything except digits, dot and minus
+    s = s.replace(',', '.').replace(/[^0-9.\-]+/g, '');
+    const n = parseFloat(s);
+    if (isFinite(n)) return n;
+  }
+  return null;
+}
+
+function buildDataStructure(json){
+  const countries={}; (json['Country']||[]).forEach(row=>{
+    countries[row.Country_Node_ID]={ id:String(row.Country_Node_ID), name:row.Country, type:'country', children:{} };
+  });
+  const regions={}; (json['Region']||[]).forEach(row=>{
+    regions[row.Region_Node_ID]={ id:String(row.Region_Node_ID), name:row.Region, type:'region', country_id:row.Country_Node_ID, children:{} };
+  });
+  const alphabets={}; (json['Alphabets']||[]).forEach(row=>{
+  // Use Region_Node_ID (you asked for this field)
+  alphabets[row.Alphabet_Node_ID]={
+    id:String(row.Alphabet_Node_ID),
+    name:row.Alphabet,
+    type:'alphabet',
+    region_id:row.Region_Node_ID,   // <— fix
+    children:{}
+  };
+});
+
+
+  const customers={};
+  function addCustomer(row, level){
+    const id = String(row.Customer_Node_ID);
+    customers[id] = {
+      id,
+      name: row.Display || row.Name || id,
+      type: level,
+      parent: row.Parent_Node_ID ? String(row.Parent_Node_ID) : null,
+      alphabet_id: row.Alphabet_Node_ID ? String(row.Alphabet_Node_ID) : null,
+      address: { street: row.Street, house: row.Hause_Number, zip: row.Zip, city: row.City },
+  latitude: parseLatLon(row.Latitude),
+  longitude: parseLatLon(row.Longitude),
+      raw: row,
+      children: {}
+    };
+  }
+  (json['Customers']||[]).forEach(r=> addCustomer(r,'master'));
+  (json['Customers_Sub']||[]).forEach(r=> addCustomer(r,'sub'));
+  (json['Customers_Sub_Sub']||[]).forEach(r=> addCustomer(r,'subsub'));
+
+  // Build tree: countries -> regions -> alphabets
+  const tree={};
+  Object.values(countries).forEach(c=> tree[c.id]={ ...c, children:{} });
+  Object.values(regions).forEach(r=>{ const c=tree[String(r.country_id)]; if(c) c.children[r.id]={ ...r, children:{} }; });
+  Object.values(alphabets).forEach(a=>{
+    const region=regions[a.region_id]; if(region){ const c=tree[String(region.country_id)];
+      if(c && c.children[region.id]) c.children[region.id].children[a.id]={ ...a, children:{} };
+    }
+  });
+  // Attach customers
+  Object.values(customers).forEach(c=>{
+    if(!c.parent){
+      const a=alphabets[c.alphabet_id]; if(a){
+        const r=regions[a.region_id]; const co=tree[String(r.country_id)];
+        if(co && co.children[r.id] && co.children[r.id].children[a.id]) co.children[r.id].children[a.id].children[c.id]=customers[c.id];
+      }
+    }else{
+      const p=customers[c.parent]; if(p) p.children[c.id]=customers[c.id];
+    }
+  });
+
+  const tanks={};
+  const pool={ customers:[], tanks:[], verdampfer:[], gasmischer:[], pufferbehalter:[], froster:[], co2:[], tafel:[], spezial:[], telemetry:[], sv:[] };
+  const counts={ verdampfer:0, gasmischer:0, pufferbehalter:0, froster:0, co2:0, tafel:0, spezial:0, telemetry:0, sv:0 };
+  // Index of every attachable object by its unique ID
+  const attachIndex = {
+    tanks: {}, verdampfer: {}, gasmischer: {}, pufferbehalter: {}, froster: {}, co2: {}, tafel: {}, spezial: {}
+  };
+  const now=new Date();
+
+  (json['Tanks']||[]).forEach(row=>{
+    const custId = row.Customer_Node_ID ? String(row.Customer_Node_ID) : null;
+    const tankId = String(row.Tank_Node_ID);
+
+    // get customer coords (if any)
+    const custLat = custId && customers[custId] ? customers[custId].latitude : null;
+    const custLon = custId && customers[custId] ? customers[custId].longitude : null;
+
+    const techNameFromRow = row[COLUMN_HEADERS.Tanks.technician_name] || '';
+    const techIdFromRow   = row[COLUMN_HEADERS.Tanks.technician] || techNameFromRow || '';
+
+    const baseObj = {
+      id: tankId,
+      name: row.Name || row.TankName || `Tank ${tankId}`,
+      type: row.Type || row.TankType || row.Tank_Type || '',
+      customer: custId,
+      // Tanks have no lat/lon in your sheet → always inherit from customer
+      latitude: custLat,
+      longitude: custLon,
+      // Keep both for convenience; if only name exists, use it as id too
+      technician_id: String(techIdFromRow || ''),
+      technician_name: String(techNameFromRow || ''),
+      raw: row,
+      equipment:{ verdampfer:[], gasmischer:[], pufferbehalter:[], froster:[], co2:[], tafel:[], spezial:[], telemetry:[], sv:[] }
+    };
+
+    // next date (optional quick glance)
+    const dates=[row['Datum Aufstellung'],row['Analyse'],row['Aussere_Prufung'],row['Elektro_Prufung'],row['Wartung'],row['wkP_Anlage'],row['wkP_Festigkeit'],row['wkP_Innere']].filter(d=> d instanceof Date);
+    let nextDate=null, status='unknown';
+    if(dates.length){
+      nextDate=dates.sort((a,b)=> a-b)[0];
+      const diff=(nextDate - now)/(1000*60*60*24);
+      status = diff<0 ? 'overdue' : (diff<=30 ? 'urgent' : 'planned');
+    }
+    baseObj.next_date = nextDate ? nextDate.toISOString().split('T')[0] : '';
+    baseObj.status = status;
+
+    if(!custId){
+      baseObj.customer=null; baseObj.status='orphan';
+      pool.tanks.push(baseObj);
+      return;
+    }
+    if(!tanks[custId]) tanks[custId]=[];
+    tanks[custId].push(baseObj);
+    // Index tank for attachments
+    attachIndex.tanks[baseObj.id] = baseObj;
+  });
+
+  function findTank(tankId){
+    for(const cid of Object.keys(tanks)){
+      for(const t of tanks[cid]) if(t.id===tankId) return t;
+    } return null;
+  }
+
+  // Verdampfer
+  (json['Verdampfer']||[]).forEach(row=>{
+    const t=findTank(String(row.Tank_Node_ID));
+    const next=row['Analyse'] instanceof Date? row['Analyse'].toISOString().split('T')[0]:'';
+    const o={ id:String(row.Verdampfer_Node_ID), name:row.Name||row.Verdampfer_Name||String(row.Verdampfer_Node_ID), type:row.Type||'', next_date:next, raw:row };
+  if(t){ t.equipment.verdampfer.push(o); counts.verdampfer++; attachIndex.verdampfer[o.id]=o; } else { pool.verdampfer.push(o); counts.verdampfer++; }
+  });
+
+  // Gasmischer + map for puffer
+  const gasmischerMap={};
+  (json['Gasmischer']||[]).forEach(row=>{
+    const t=findTank(String(row.Tank_Node_ID));
+    const id=String(row.Gasmischer_Node_ID);
+    const next=row['Analyse'] instanceof Date? row['Analyse'].toISOString().split('T')[0]:'';
+    const o={ id, name:row.Name||row.Gasmischer_Name||id, type:row.Type||'', next_date:next, pufferbehalter:[], raw:row };
+    gasmischerMap[id]=o;
+  if(t){ t.equipment.gasmischer.push(o); counts.gasmischer++; attachIndex.gasmischer[o.id]=o; } else { pool.gasmischer.push(o); counts.gasmischer++; }
+  });
+
+  (json['Pufferbehalter']||[]).forEach(row=>{
+    const gm=gasmischerMap[String(row.Gasmischer_Node_ID)];
+    const o={ id:String(row.Pufferbehalter_Node_ID), name:row.Name||row.Pufferbehalter_Name||String(row.Pufferbehalter_Node_ID), type:row.Type||'', next_date: row['Analyse'] instanceof Date? row['Analyse'].toISOString().split('T')[0]:'', raw:row };
+  if(gm){ gm.pufferbehalter.push(o); counts.pufferbehalter++; attachIndex.pufferbehalter[o.id]=o; } else { pool.pufferbehalter.push(o); counts.pufferbehalter++; }
+  });
+
+  (json['Froster']||[]).forEach(row=>{
+    const t=findTank(String(row.Tank_Node_ID));
+    const o={ id:String(row.Froster_ID), name:row.Name||row.Froster_Name||String(row.Froster_ID), type:row.Type||'', next_date: row['Analyse'] instanceof Date? row['Analyse'].toISOString().split('T')[0]:'', raw:row };
+  if(t){ t.equipment.froster.push(o); counts.froster++; attachIndex.froster[o.id]=o; } else { pool.froster.push(o); counts.froster++; }
+  });
+
+  (json['CO2_Kaltemaschine']||[]).forEach(row=>{
+    const t=findTank(String(row.Tank_Node_ID));
+    const o={ id:String(row.Kaltmaschine_Node_ID), name:row.Name||row.Kaltmaschine_Name||String(row.Kaltmaschine_Node_ID), type:row.Type||'', next_date: row['Analyse'] instanceof Date? row['Analyse'].toISOString().split('T')[0]:'', raw:row };
+  if(t){ t.equipment.co2.push(o); counts.co2++; attachIndex.co2[o.id]=o; } else { pool.co2.push(o); counts.co2++; }
+  });
+
+  (json['Tafel']||[]).forEach(row=>{
+    const t=findTank(String(row.Tank_Node_ID));
+    const o={ id:String(row.Tafel_Node_ID), name:row.Name||row.Tafel_Name||String(row.Tafel_Node_ID), type:row.Type||'', raw:row };
+  if(t){ t.equipment.tafel.push(o); counts.tafel++; attachIndex.tafel[o.id]=o; } else { pool.tafel.push(o); counts.tafel++; }
+  });
+
+  (json['Spezial']||json['Spezial ']||[]).forEach(row=>{
+    const tankId=row.TANK_Node_Id || row.Tank_Node_Id;
+    const t=findTank(String(tankId));
+    const o={ id:String(row.Spezial_Node_ID), name:row.Name||row.Spezial_Name||String(row.Spezial_Node_ID), type:row.Type||'', raw:row };
+  if(t){ t.equipment.spezial.push(o); counts.spezial++; attachIndex.spezial[o.id]=o; } else { pool.spezial.push(o); counts.spezial++; }
+  });
+
+  (json['Telemetry']||[]).forEach(row=>{
+    const t=findTank(String(row.Tank_Node_Id));
+    const o={ id:String(row.Telemetry_Node_ID), name:row.Name||row.Telemetry_Name||String(row.Telemetry_Node_ID), type:row.Type||'', raw:row };
+    if(t){ t.equipment.telemetry.push(o); counts.telemetry++; } else { pool.telemetry.push(o); counts.telemetry++; }
+  });
+
+  (json['SV'] || []).forEach(row => {
+    const parentId = row[COLUMN_HEADERS.SV.parent] ? String(row[COLUMN_HEADERS.SV.parent]) : null;
+    const rawType  = row[COLUMN_HEADERS.SV.type];
+
+    const svObj = {
+      id: String(row[COLUMN_HEADERS.SV.id]),
+      name: normalizeSVTypeLabel(rawType) || String(row[COLUMN_HEADERS.SV.id]),
+      type: normalizeSVTypeLabel(rawType) || '',
+      raw: row
+    };
+
+    let attached = false;
+    const attachTo = (target) => {
+      if (target.equipment && Array.isArray(target.equipment.sv)) {
+        // It's a tank object – keep SVs in the tank’s equipment group
+        target.equipment.sv.push(svObj);
+      } else {
+        // It's an equipment item – hang SVs directly on the item
+        target.sv = target.sv || [];
+        target.sv.push(svObj);
+      }
+      counts.sv++;
+      attached = true;
+    };
+
+    if (parentId) {
+      if (attachIndex.tanks[parentId]) attachTo(attachIndex.tanks[parentId]);
+      else if (attachIndex.verdampfer[parentId]) attachTo(attachIndex.verdampfer[parentId]);
+      else if (attachIndex.gasmischer[parentId]) attachTo(attachIndex.gasmischer[parentId]);
+      else if (attachIndex.pufferbehalter[parentId]) attachTo(attachIndex.pufferbehalter[parentId]);
+      else if (attachIndex.froster[parentId]) attachTo(attachIndex.froster[parentId]);
+      else if (attachIndex.co2[parentId]) attachTo(attachIndex.co2[parentId]);
+      else if (attachIndex.tafel[parentId]) attachTo(attachIndex.tafel[parentId]);
+      else if (attachIndex.spezial[parentId]) attachTo(attachIndex.spezial[parentId]);
+    }
+
+    if (!attached) {
+      pool.sv.push(svObj);
+      counts.sv++;
+    }
+  });
+
+  const technicians=(json['Technicians']||[]).map(row=>({ id:String(row.TechnicianID), name:row['Technician Name'] }));
+  const totals={ customers:Object.keys(customers).length, tanks:Object.values(tanks).reduce((s,l)=> s+l.length,0), equipment:Object.values(counts).reduce((s,v)=> s+v,0) };
+  const customerLevels={ master:0, sub:0, subsub:0 }; Object.values(customers).forEach(c=> customerLevels[c.type]++);
+  function hasTanksInSubtree(cid){
+    if(tanks[cid]?.length) return true;
+    const node=customers[cid]; if(!node?.children) return false;
+    for(const childId of Object.keys(node.children)) if(hasTanksInSubtree(childId)) return true;
+    return false;
+  }
+  Object.keys(customers).forEach(cid=>{ try{ if(!hasTanksInSubtree(cid)){ const c=customers[cid]; pool.customers.push({ id:cid, name:c.name||cid, type:c.type }); } }catch(e){} });
+
+  // Timeline example (kept)
+  const timeline={}; for(let i=0;i<=30;i++) timeline[i]=0;
+  const nowDate=new Date();
+  Object.values(tanks).forEach(list=>{
+    list.forEach(t=>{
+      if(t.next_date){
+        const d=new Date(t.next_date+'T00:00:00');
+        const diff=Math.ceil((d-nowDate)/(1000*60*60*24));
+        if(diff>=0 && diff<=30) timeline[diff]=(timeline[diff]||0)+1;
+      }
+    });
+  });
+
+  return { tree, tanks, technicians, counts, totals, timeline, pool, customerLevels };
+}
+
+/* ====================== TREE ====================== */
+function initTree(){
+  const treeData=[];
+  function traverse(node, arr){
+    const items=Object.values(node||{}).slice().sort((a,b)=> (a.name||'').toLowerCase().localeCompare((b.name||'').toLowerCase()));
+    items.forEach((item)=>{
+      const typeIconMap={ country:'fa-globe', region:'fa-map', alphabet:'fa-hashtag', master:'fa-building', sub:'fa-store', subsub:'fa-shop' };
+      const jsNode={ id:item.id, text:`${item.name} (${item.type})`, data:{ type:item.type }, icon:`fa ${typeIconMap[item.type]||'fa-folder'}`, children:[] };
+      if(['master','sub','subsub'].includes(item.type)){
+        const tanks=(appData.tanks[item.id]||[]).slice().sort((a,b)=> (a.name||'').localeCompare((b.name||'')));
+        tanks.forEach((t)=>{
+          const tn={ id:`tank-${t.id}`, text: t.name? `${t.name} (${t.id})`: `Tank ${t.id}`, data:{ type:'tank', tankId:t.id, customerId:item.id }, icon:'fa fa-oil-can', children:[] };
+          Object.keys(t.equipment||{}).forEach(etype=>{
+            const items=t.equipment[etype];
+            if(items?.length){
+              const groupIconMap={ verdampfer:'fa-snowflake', gasmischer:'fa-wind', pufferbehalter:'fa-box', froster:'fa-snowman', co2:'fa-wind', tafel:'fa-th-large', spezial:'fa-star', telemetry:'fa-signal', sv:'fa-shield' };
+              const g={ id:`tank-${t.id}-eq-${etype}`, text:`${etype} (${items.length})`, data:{ type:'equipment_group', eqtype:etype, tankId:t.id }, icon:`fa ${groupIconMap[etype]||'fa-cog'}`, children:[] };
+              (items||[]).slice().sort((ia,ib)=> (String(ia?.name||ia?.Type||ia?.id||'')).localeCompare(String(ib?.name||ib?.Type||ib?.id||''))).forEach(it=>{
+                const itId = it.id || it.Telemetry_Node_ID || it.Spezial_Node_ID || it.Tafel_Node_ID || it.id;
+                const label = it.name || it.Type || itId;
+
+                const itemNode = {
+                  id: `tank-${t.id}-eq-${etype}-${itId}`,
+                  text: `${label} (${itId})`,
+                  data: { type: etype, tankId: t.id },
+                  icon: `fa ${groupIconMap[etype]||'fa-cog'}`,
+                  children: []
+                };
+
+                // NEW: nest any SVs attached to this equipment item
+                if (Array.isArray(it.sv) && it.sv.length){
+                  it.sv.forEach(sv=>{
+                    itemNode.children.push({
+                      id: `tank-${t.id}-eq-${etype}-sv-${sv.id}`,
+                      text: `SV ${sv.name || sv.id} (${sv.id})`,
+                      data: { type: 'sv', tankId: t.id },
+                      icon: 'fa fa-shield'
+                    });
+                  });
+                }
+
+                g.children.push(itemNode);
+              });
+              tn.children.push(g);
+            }
+          });
+          jsNode.children.push(tn);
+        });
+      }
+      arr.push(jsNode);
+      if(Object.keys(item.children).length) traverse(item.children, jsNode.children);
+    });
+  }
+  traverse(appData.tree, treeData);
+
+  // Pool node
+  const poolNode={ id:'pool-root', text:'Pool', data:{ type:'pool' }, icon:'fa fa-inbox', children:[] };
+  const poolCustomersNode={ id:'pool-customers', text:`Pool Customers (${appData.pool?.customers?.length||0})`, data:{ type:'pool_customers' }, icon:'fa fa-users', children:[] };
+  (appData.pool?.customers||[]).forEach(c=> poolCustomersNode.children.push({ id:`pool-cust-${c.id}`, text:`${c.name} (${c.id})`, data:{ type:'pool_customer', customerId:c.id }, icon:'fa fa-user' }));
+  poolNode.children.push(poolCustomersNode);
+  const poolTanksNode={ id:'pool-tanks', text:`Pool Tanks (${appData.pool?.tanks?.length||0})`, data:{ type:'pool_tanks' }, icon:'fa fa-oil-can', children:[] };
+  (appData.pool?.tanks||[]).forEach(t=> poolTanksNode.children.push({ id:`pool-tank-${t.id}`, text:`${t.name} (${t.id})`, data:{ type:'pool_tank', tankId:t.id }, icon:'fa fa-oil-can' }));
+  poolNode.children.push(poolTanksNode);
+  ['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'].forEach(g=>{
+    const child={ id:`pool-${g}`, text:`${g} (pool) (${appData.pool?.[g]?.length||0})`, data:{ type:'pool_group', group:g }, icon:'fa fa-box', children:[] };
+    (appData.pool?.[g]||[]).forEach(it=> child.children.push({ id:`pool-${g}-${it.id}`, text:`${it.name} (${it.id})`, data:{ type:g, pool:true }, icon:'fa fa-box' }));
+    poolNode.children.push(child);
+  });
+  treeData.push(poolNode);
+
+  if(treeInstance){ $('#tree').jstree(true).settings.core.data=treeData; $('#tree').jstree(true).refresh(); }
+  else{
+    $('#tree').jstree({ core:{ data:treeData, check_callback:true }, plugins:['search','types'] });
+    treeInstance=$('#tree').jstree(true);
+
+    $('#tree').on('select_node.jstree', (e,data)=>{
+      const nodeId=data.node.id;
+      const nodeType=data.node.data.type;
+      let customerIds=[];
+      if(['country','region','alphabet'].includes(nodeType)){
+        customerIds = getCustomersUnderNode(nodeId, nodeType);
+      }else if(['master','sub','subsub'].includes(nodeType)){
+        customerIds=[nodeId];
+      }else if(nodeType==='tank'){
+        const cust=data.node.data.customerId || getCustomerFromTankId(data.node.data.tankId);
+        if(cust) customerIds=[cust];
+      }else if(['equipment_group','verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'].includes(nodeType)){
+        const cust=data.node.data.customerId || getCustomerFromTankId(data.node.data.tankId);
+        if(cust) customerIds=[cust];
+      }else if(nodeType==='pool'){ updateCustomerMap([]); updateMaintenance([]); updatePoolStats(); return; }
+      else if(nodeType==='pool_group'){ const g=data.node.data.group; updateCustomerMap([]); updateMaintenance([]); updatePoolStats(g); return; }
+
+      updateCustomerMap(customerIds);
+      updateMaintenance(customerIds);
+      updateStats(customerIds);
+      if(['master','sub','subsub'].includes(nodeType)) openDetails(nodeId);
+      else if(nodeType==='tank'){ const cust=data.node.data.customerId || getCustomerFromTankId(data.node.data.tankId); if(cust) openDetails(cust); }
+    });
+
+    $('#tree').on('open_node.jstree',(e,data)=>{
+      const tree=$('#tree').jstree(true);
+      const model=tree._model?.data||{};
+      Object.keys(model).forEach(id=>{
+        try{
+          const n=model[id];
+          if(n?.state?.opened){
+            if(id===data.node.id) return;
+            if((data.node.parents||[]).indexOf(id)!==-1) return;
+            tree.close_node(id);
+          }
+        }catch(err){}
+      });
+    });
+
+    $('#treeSearch').on('keyup', function(){ treeInstance.search($(this).val()); });
+  }
+}
+
+// --- SV helpers ---
+function normalizeSVTypeLabel(s){
+  if (s == null) return 'Unknown';
+  return String(s)
+    .normalize('NFKC')                            // tidy up compatibility chars
+    // single quotes / primes -> '
+    .replace(/[\u2018\u2019\u201B\u2032]/g, "'")
+    .replace(/[`´]/g, "'")
+    // double quotes / double primes -> "
+    .replace(/[\u201C\u201D\u2033]/g, '"')
+    // if someone typed two (or more) apostrophes to mean inches → make them one "
+    .replace(/'{2,}/g, '"')
+    // collapse accidental repeated double quotes
+    .replace(/"{2,}/g, '"')
+    // whitespace cleanup around quotes
+    .replace(/\s+"/g, ' "').replace(/"\s+/g, '"')
+    .replace(/\s+'/g, " '").replace(/'\s+/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Display-only prettifier: keeps counts the same, just improves how labels look.
+function prettySVLabel(s){
+  if(!s) return '';
+  let t = String(s);
+
+  // use ASCII slash instead of U+2044 “fraction slash”
+  t = t.replace(/\u2044/g, '/');
+
+  // swap common fractions to glyphs
+  t = t.replace(/\b1\/2\b/g, '½')
+       .replace(/\b1\/4\b/g, '¼')
+       .replace(/\b3\/4\b/g, '¾');
+
+  // ensure a space before NPT/NPTF if missing: 1/4"NPT -> 1/4" NPT
+  t = t.replace(/"(?=NPTF?\b)/, '" ');
+
+  // collapse extra spaces
+  t = t.replace(/\s{2,}/g, ' ').trim();
+
+  return t;
+}
+
+// Grouping key generator and pretty label from key for dedupe-friendly buckets
+function svGroupKey(label){
+  let t = normalizeSVTypeLabel(label || '');
+  // fraction/glyph -> ascii
+  t = t.replace(/\u2044/g, '/')
+       .replace(/½/g, '1/2')
+       .replace(/¼/g, '1/4')
+       .replace(/¾/g, '3/4');
+  // unify NPTF -> NPT
+  t = t.replace(/\bNPTF\b/gi, 'NPT');
+  // ensure space before NPT
+  t = t.replace(/"(?=NPT\b)/i, '" ');
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  return t;
+}
+
+function svPrettyLabelFromKey(key){
+  let s = String(key || '');
+  s = s.replace(/\b1\/2\b/g, '½')
+       .replace(/\b1\/4\b/g, '¼')
+       .replace(/\b3\/4\b/g, '¾');
+  return s;
+}
+
+// collect all SVs from a tank: tank-level + under ANY equipment parent
+function collectSVsFromTank(t){
+  const list = [];
+  if (Array.isArray(t.equipment?.sv)) list.push(...t.equipment.sv);
+  ['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial'].forEach(g=>{
+    (t.equipment[g]||[]).forEach(it=>{
+      if (Array.isArray(it.sv)) list.push(...it.sv);
+    });
+  });
+  return list;
+}
+
+// Debug helper: quick console check for SV counts per customer and total
+function debugSVCounts(){
+  const result = { total:0, perCustomer: {} };
+  const tanksByCustomer = appData.tanks || {};
+  Object.keys(tanksByCustomer).forEach(cid=>{
+    const list = tanksByCustomer[cid] || [];
+    let custTotal = 0;
+    list.forEach(t => { const svs = collectSVsFromTank(t); custTotal += (svs||[]).length; });
+    result.perCustomer[cid] = custTotal;
+    result.total += custTotal;
+  });
+  console.table(result.perCustomer);
+  console.log('SV total:', result.total);
+  return result;
+}
+window.debugSVCounts = debugSVCounts;
+
+
+/* helpers to locate customers */
+function getCustomerFromTankId(tankId){
+  if(!tankId) return null;
+  for(const cid of Object.keys(appData.tanks||{})){
+    const list=appData.tanks[cid];
+    if(list && list.some(t=> String(t.id)===String(tankId))) return cid;
+  } return null;
+}
+function getCustomersUnderNode(nodeId, nodeType){
+  const ids=[];
+  function findNode(tree, targetId, targetType){
+    for(const key of Object.keys(tree)){
+      const item=tree[key];
+      if(item.id===targetId && item.type===targetType) return item;
+      const found=findNode(item.children, targetId, targetType);
+      if(found) return found;
+    } return null;
+  }
+  const start=findNode(appData.tree, nodeId, nodeType);
+  function collectCustomers(item){
+    Object.values(item.children).forEach((ch)=>{
+      if(['master','sub','subsub'].includes(ch.type)) ids.push(ch.id);
+      collectCustomers(ch);
+    });
+  }
+  if(start) collectCustomers(start);
+  return ids;
+}
+function findCustomerNodeById(tree, id){
+  let f=null; (function walk(node){ Object.values(node||{}).forEach(n=>{ if(n.id===id && ['master','sub','subsub'].includes(n.type)) f=n; if(!f && n.children) walk(n.children); }); })(tree);
+  return f;
+}
+function getCustomerCode(custNode){ const cRaw=custNode?.raw||null; if(!cRaw) return ''; return cRaw[COLUMN_HEADERS.Customers.code]||''; }
+
+/* ====================== MAPS ====================== */
+// ---- marker helpers (dot + colors) ----
+function markerColor(tag){
+  const t = String(tag||'').toLowerCase();
+  // planner statuses: red/pink/green
+  // tank statuses: overdue/urgent/planned
+  if (t === 'red' || t === 'overdue') return '#dc2626';  // overdue -> red
+  if (t === 'pink' || t === 'urgent')  return '#16a34a'; // 0–3 months -> green
+  return '#2563eb';                                      // future -> blue
+}
+function makeDotMarker(lat, lon, tag){
+  const color = markerColor(tag);
+  return L.circleMarker([lat, lon], {
+    radius: 6, weight: 1, color, fillColor: color, fillOpacity: 0.9
+  });
+}
+// aggregate customer status from its tanks (for Map tab)
+function customerStatusTag(cid){
+  const list = (appData.tanks[cid] || []).map(t => String(t.status||'').toLowerCase());
+  if (list.includes('overdue')) return 'overdue';
+  if (list.includes('urgent'))  return 'urgent';
+  return 'planned';
+}
+function initMaps(){
+  customerMap = L.map('customerMap').setView([51.1657,10.4515],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap contributors' }).addTo(customerMap);
+  maintenanceMap = L.map('maintenanceMap').setView([51.1657,10.4515],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap contributors' }).addTo(maintenanceMap);
+}
+function updateCustomerMap(customerIds){
+  const key = selectionKey(customerIds);
+  const same = (key === currentTreeSelectionKey);
+
+  // If selection didn't change, just fix size and return (avoid re-render/flicker)
+  if(same){
+    try{ customerMap?.invalidateSize(); }catch(e){}
+    return;
+  }
+  currentTreeSelectionKey = key;
+
+  // Clear old markers group
+  if(customerMarkersGroup){
+    try{ customerMap.removeLayer(customerMarkersGroup); }catch(e){}
+    customerMarkersGroup = null;
+  }
+  customerMarkersGroup = L.layerGroup().addTo(customerMap);
+
+  const findNode = (id) => findCustomerNodeById(appData.tree, id);
+  const markers = [];
+
+  (customerIds || []).forEach((cid)=>{
+    const custNode = findNode(cid);
+    if(!custNode) return;
+    const lat = custNode.latitude;
+    const lon = custNode.longitude;
+    if(typeof lat !== 'number' || typeof lon !== 'number') return;
+
+    const tanks = appData.tanks[cid] || [];
+    const tankRows = tanks.map(t=>{
+      const next = t.next_date || '';
+      const st   = t.status || '';
+      const inv  = t.raw?.[COLUMN_HEADERS.Tanks.inventory] || '';
+      return `<tr>
+        <td style="padding:2px 6px;">${escapeHtml(t.name || `Tank ${t.id}`)}</td>
+        <td style="padding:2px 6px;">${escapeHtml(String(t.id))}</td>
+        <td style="padding:2px 6px;">${escapeHtml(inv)}</td>
+        <td style="padding:2px 6px;">${escapeHtml(next)}</td>
+        <td style="padding:2px 6px;">${escapeHtml(st)}</td>
+      </tr>`;
+    }).join('');
+
+    const title = escapeHtml(custNode.name || cid);
+    const city  = escapeHtml(custNode.address?.city || '');
+    const html = `
+      <div style="min-width:280px">
+        <div style="font-weight:700;margin-bottom:4px">${title} ${city?`<span class="text-muted">• ${city}</span>`:''}</div>
+        <div class="small text-muted" style="margin-bottom:4px">Tanks at this location: <strong>${tanks.length}</strong></div>
+        <div style="max-height:180px;overflow:auto;border:1px solid #e5e7eb;border-radius:6px;">
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead style="position:sticky;top:0;background:#f8fafc">
+              <tr>
+                <th style="padding:4px 6px;text-align:left;">Tank</th>
+                <th style="padding:4px 6px;text-align:left;">ID</th>
+                <th style="padding:4px 6px;text-align:left;">Inv</th>
+                <th style="padding:4px 6px;text-align:left;">Next</th>
+                <th style="padding:4px 6px;text-align:left;">Status</th>
+              </tr>
+            </thead>
+            <tbody>${tankRows || '<tr><td colspan="5" style="padding:6px;">No tanks</td></tr>'}</tbody>
+          </table>
+        </div>
+        <button class="btn btn-sm btn-primary mt-2" onclick="openDetails('${cid}')">Details</button>
+      </div>`;
+
+  const m = makeDotMarker(lat, lon, customerStatusTag(cid)).bindPopup(html);
+    customerMarkersGroup.addLayer(m);
+    markers.push(m);
+  });
+
+  fitBoundsIfAny(customerMap, customerMarkersGroup);
+}
+
+window.openDetails=function(customerId){
+  try{ document.getElementById('details-tab')?.click(); renderDetailsForCustomer(customerId); }catch(e){ console.warn('openDetails failed',e); }
+};
+
+/* ====================== DETAILS RENDER (unchanged core) ====================== */
+function renderDetailsForCustomer(customerId){
+  const panel=document.getElementById('detailsPanel'); if(!panel) return; panel.innerHTML='';
+  function findNodeById(node,id){ for(const k of Object.keys(node||{})){ const it=node[k]; if(it.id===id && ['master','sub','subsub'].includes(it.type)) return it; if(it.children){ const f=findNodeById(it.children,id); if(f) return f; } } return null; }
+  const custNode=findNodeById(appData.tree, customerId);
+
+  const custBox=document.createElement('div'); custBox.className='stat-box';
+  const cRaw=custNode?.raw||null;
+  const custName=(cRaw && cRaw[COLUMN_HEADERS.Customers.name]) || (custNode?.name) || customerId;
+  const street=cRaw? (cRaw[COLUMN_HEADERS.Customers.street]||'') : (custNode.address?.street||'');
+  const house=cRaw? (cRaw[COLUMN_HEADERS.Customers.house]||'') : (custNode.address?.house||'');
+  const zip  =cRaw? (cRaw[COLUMN_HEADERS.Customers.zip]  ||'') : (custNode.address?.zip||'');
+  const city =cRaw? (cRaw[COLUMN_HEADERS.Customers.city] ||'') : (custNode.address?.city||'');
+  const addr = `${street||''} ${house||''}${(zip||city)?', ':''}${zip||''} ${city||''}`.trim();
+  const code = cRaw? (cRaw[COLUMN_HEADERS.Customers.code]||'') : (custNode.code||'');
+  custBox.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between"><div><div class="details-customer-name">${custName}</div><div style="font-size:.95rem;color:#334155;"><strong>Anschrift:</strong> ${addr}</div><div style="font-size:.95rem;color:#334155;"><strong>Kunden-Nr:</strong> ${code}</div></div><div><img src="logo.png" alt="Logo" style="height:44px;opacity:.95" onerror="this.style.display='none'"></div></div>`;
+  panel.appendChild(custBox);
+
+  function renderChildren(node,container){
+    if(!node?.children) return;
+    Object.values(node.children).forEach(ch=>{
+      if(['sub','subsub','master'].includes(ch.type)){
+        const box=document.createElement('div');
+        box.style.border='1px solid var(--border-color)'; box.style.padding='8px'; box.style.marginTop='8px';
+        const cRaw=ch?.raw||null;
+        const name=cRaw? (cRaw[COLUMN_HEADERS.Customers.name]||ch.name) : (ch.name||'');
+        const street=cRaw? (cRaw[COLUMN_HEADERS.Customers.street]||'') : (ch.address?.street||'');
+        const house=cRaw? (cRaw[COLUMN_HEADERS.Customers.house]||'') : (ch.address?.house||'');
+        const zip=cRaw? (cRaw[COLUMN_HEADERS.Customers.zip]||'') : (ch.address?.zip||'');
+        const city=cRaw? (cRaw[COLUMN_HEADERS.Customers.city]||'') : (ch.address?.city||'');
+        const addr=`${street||''} ${house||''}${(zip||city)?', ':''}${zip||''} ${city||''}`.trim();
+        const code=cRaw? (cRaw[COLUMN_HEADERS.Customers.code]||'') : (ch.code||'');
+        box.innerHTML=`<div style="font-weight:700;"><span class="details-customer-name">${name}</span> (${ch.type})</div><div><strong>Anschrift:</strong> ${addr}</div><div><strong>Code:</strong> ${code}</div>`;
+        container.appendChild(box);
+        renderTanksForCustomer(ch.id, container); renderChildren(ch, container);
+      }
+    });
+  }
+
+  function renderTanksForCustomer(cid, container){
+    const tanks=appData.tanks[cid]||[]; if(!tanks.length) return;
+    const tHeader=document.createElement('div'); tHeader.style.marginTop='8px'; tHeader.innerHTML=`<strong>Tanks (${tanks.length})</strong>`; container.appendChild(tHeader);
+
+    const behalterLabels=[
+      {label:'Bezeichnung',key:COLUMN_HEADERS.Tanks.bezeichnung},
+      {label:'Typ',key:COLUMN_HEADERS.Tanks.type},
+      {label:'Inventar-Nr.',key:COLUMN_HEADERS.Tanks.inventory},
+      {label:'Fabrikat Nr.',key:COLUMN_HEADERS.Tanks.fabrikat},
+      {label:'Equipment Nr.',key:COLUMN_HEADERS.Tanks.equipment_number},
+      {label:'Gasart',key:COLUMN_HEADERS.Tanks.gasart},
+      {label:'Produktnummer',key:COLUMN_HEADERS.Tanks.product},
+    ];
+    const behaelterdatenLabels=[
+      {label:'Zul. Betriebsdruck (bar)',key:COLUMN_HEADERS.Tanks.zul},
+      {label:'Arbeitsdruck AD (bar)',key:COLUMN_HEADERS.Tanks.arbeitsdruck},
+      {label:'Geometr. Behälterinhalt (l)',key:COLUMN_HEADERS.Tanks.geometr},
+      {label:'Hersteller',key:COLUMN_HEADERS.Tanks.hersteller},
+      {label:'Baujahr',key:COLUMN_HEADERS.Tanks.baujahr},
+      {label:'Datum Aufstellung',key:COLUMN_HEADERS.Tanks.datum_aufstellung,format:'de-date'},
+    ];
+    const pruefungLabels=[
+      {label:'Wartung',key:COLUMN_HEADERS.Tanks.wartung,format:'year-month'},
+      {label:'Analyse',key:COLUMN_HEADERS.Tanks.analyse,format:'year-month'},
+      {label:'wkP Anlage',key:COLUMN_HEADERS.Tanks.wkP_Anlage,format:'year-month'},
+      {label:'wkP Innere',key:COLUMN_HEADERS.Tanks.wkP_Innere,format:'year-month'},
+      {label:'wkP Festigkeit',key:COLUMN_HEADERS.Tanks.wkP_Festigkeit,format:'year-month'},
+      {label:'Äußere Prüfung',key:COLUMN_HEADERS.Tanks.aussere,format:'year-month'},
+      {label:'Elektro-Prüfung',key:COLUMN_HEADERS.Tanks.elektro,format:'year-month'},
+      {label:'LTPP',key:COLUMN_HEADERS.Tanks.ltpp,format:'year-month'},
+    ];
+
+    function formatDate(val,type){
+      if(val===null || val===undefined || val==='') return '';
+      if(!isNaN(val) && Number(val)>3000){ const base=new Date(Date.UTC(1899,11,30)); const d=new Date(base.getTime()+Number(val)*86400000);
+        if(type==='year-month') return `${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+        if(type==='de-date') return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+      }
+      const d=new Date(val);
+      if(!isNaN(d)){
+        if(type==='year-month') return `${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+        if(type==='de-date') return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+      }
+      return val||'';
+    }
+    function getField(obj,names){
+      if(obj?.raw){ for(const n of names){ if(!n) continue; const v=obj.raw[n]; if(v!==undefined && v!==null && String(v).trim()!=='') return v; } }
+      for(const n of names){ if(!n) continue; const v=obj[n]; if(v!==undefined && v!==null && String(v).trim()!=='') return v; }
+      return '';
+    }
+
+    tanks.forEach(t=>{
+      const behalterTable = `
+        <table class="tank-table">
+          <tr><th colspan="2" style="color:#f59e0b;text-align:left;font-size:1.05em;padding-bottom:6px;">Behälter</th></tr>
+          ${behalterLabels.map(l=>`
+            <tr><td class="tank-table-label">${l.label}</td>
+                <td class="tank-table-value">${getField(t,[l.key,l.key?.replace(/ /g,'_'),l.key?.replace(/ /g,''),l.key?.toLowerCase()])}</td></tr>`).join('')}
+        </table>`;
+      const behaelterdatenTable = `
+        <table class="tank-table tank-middle-table">
+          <tr><th colspan="2" style="color:#f59e0b;text-align:left;font-size:1.05em;padding-bottom:6px;">Behälterdaten</th></tr>
+          ${behaelterdatenLabels.map(l=>{ let v=getField(t,[l.key,l.key?.replace(/ /g,'_'),l.key?.replace(/ /g,''),l.key?.toLowerCase()]); if(l.format) v=formatDate(v,l.format);
+            return `<tr><td class="tank-table-label">${l.label}</td><td class="tank-table-value">${v}</td></tr>`; }).join('')}
+        </table>`;
+      const pruefungTable = `
+        <table class="tank-table">
+          <tr><th colspan="2" style="color:#f59e0b;text-align:left;font-size:1.05em;padding-bottom:6px;">Nächste Prüfungen</th></tr>
+          ${pruefungLabels.map(l=>{ let v=getField(t,[l.key,l.key?.replace(/ /g,'_'),l.key?.replace(/ /g,''),l.key?.toLowerCase()]); if(l.format) v=formatDate(v,l.format);
+            return `<tr><td class="tank-table-label">${l.label}</td><td class="tank-table-value">${v}</td></tr>`; }).join('')}
+        </table>`;
+      const remarks=getField(t,['Bemerkungen','Bemerkung','notes']);
+      const block=document.createElement('div'); block.style.marginTop='8px';
+      block.innerHTML = `
+        <hr style="margin:12px 0 16px 0;">
+        <div class="details-row">
+          <div class="details-col">${behalterTable}</div>
+          <div class="details-col middle">${behaelterdatenTable}</div>
+          <div class="details-col">${pruefungTable}</div>
+        </div>
+        ${remarks? `<div class="details-remarks"><strong>Bemerkungen:</strong><div style="white-space:pre-wrap;margin-top:6px;">${remarks}</div></div>`:''}`;
+      container.appendChild(block);
+
+      const equipmentOrder=['verdampfer','gasmischer','pufferbehalter','froster','tafel','co2','spezial','telemetry','sv'];
+      const headerKeyMap={ verdampfer:'Verdampfer', gasmischer:'Gasmischer', pufferbehalter:'Pufferbehalter', froster:'Froster', tafel:'Tafel', co2:'CO2', spezial:'Spezial', telemetry:'Telemetry', sv:'SV' };
+      function renderEquipment(item, grp, parent){
+  const cfgKey = headerKeyMap[grp] || (grp[0].toUpperCase() + grp.slice(1));
+  const hdr = COLUMN_HEADERS[cfgKey] || {};
+
+  function fmtDate(v, type){
+    if(v===null || v===undefined || v==='') return '';
+    if(!isNaN(v) && Number(v)>3000){
+      const base=new Date(Date.UTC(1899,11,30));
+      const d=new Date(base.getTime()+Number(v)*86400000);
+      if(type==='year-month') return `${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+      if(type==='de-date')   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+    }
+    const d=new Date(v);
+    if(!isNaN(d)){
+      if(type==='year-month') return `${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+      if(type==='de-date')   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+    }
+    return v||'';
+  }
+  function get(obj, keys){
+    if(obj?.raw){
+      for(const k of keys){ const v=obj.raw[k]; if(v!==undefined && v!==null && String(v).trim()!=='') return v; }
+    }
+    for(const k of keys){ const v=obj[k]; if(v!==undefined && v!==null && String(v).trim()!=='') return v; }
+    return '';
+  }
+
+  /* === TELEMETRY: single box, split in half with a vertical divider — Typ first === */
+  if (grp === 'telemetry') {
+    const cfgKey = headerKeyMap[grp] || (grp[0].toUpperCase() + grp.slice(1));
+    const hdr = COLUMN_HEADERS[cfgKey] || {};
+
+    function get(obj, keys){
+      if (obj?.raw){
+        for (const k of keys){
+          const v = obj.raw[k];
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
+      }
+      for (const k of keys){
+        const v = obj[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+      return '';
+    }
+
+    const typeVal = get(item, [hdr.type || 'Type', 'Type', 'type']);
+    const nameVal = get(item, [hdr.name || 'Name', 'Name', 'name']); // preserves "0403" from earlier step
+
+    const wrapper = document.createElement('div');
+    wrapper.style.marginTop = '8px';
+    wrapper.innerHTML = `
+      <div class="details-remarks" style="padding:0;">
+        <div style="
+          display:grid;
+          grid-template-columns: 1fr 1fr;
+          align-items:center;
+          min-height:48px;
+        ">
+          <div style="padding:8px 12px;">
+            <strong>Typ:</strong> ${typeVal ?? ''}
+          </div>
+          <div style="padding:8px 12px; border-left:1px solid rgba(15,23,42,0.15);">
+            <strong>Bezeichnung:</strong> ${nameVal ?? ''}
+          </div>
+        </div>
+      </div>`;
+    parent.appendChild(wrapper);
+    return; // no 3-column layout for telemetry
+  }
+
+  // SV specific rendering: full 3-column card when rendering an SV itself
+  if (grp === 'sv') {
+    const hdrSV = COLUMN_HEADERS.SV || {};
+    const getSV = (obj, keys) => {
+      if (obj?.raw) for (const k of keys) { const v = obj.raw[k]; if (v !== undefined && v !== null && String(v).trim() !== '') return v; }
+      for (const k of keys) { const v = obj[k]; if (v !== undefined && v !== null && String(v).trim() !== '') return v; }
+      return '';
+    };
+    const fmt = (v) => {
+      if (v===null || v===undefined || v==='') return '';
+      if(!isNaN(v) && Number(v)>3000){ const base=new Date(Date.UTC(1899,11,30)); const d=new Date(base.getTime()+Number(v)*86400000); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
+      const d=new Date(v); if(!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; return v||'';
+    };
+
+    const leftTable = `
+      <table class="tank-table">
+        <tr><th colspan="2" style="color:#f59e0b;text-align:left;font-size:1.02em;padding-bottom:6px;">SV</th></tr>
+        <tr><td class="tank-table-label">P-ID</td><td class="tank-table-value">${getSV(item, [hdrSV.p_id])}</td></tr>
+        <tr><td class="tank-table-label">Typ</td><td class="tank-table-value">${getSV(item, [hdrSV.type])}</td></tr>
+        <tr><td class="tank-table-label">Fabrikat Nr.</td><td class="tank-table-value">${getSV(item, [hdrSV.fabrikat])}</td></tr>
+        <tr><td class="tank-table-label">TÜV / SV Nr.</td><td class="tank-table-value">${getSV(item, [hdrSV.tuv])}</td></tr>
+      </table>`;
+
+    const middleTable = `
+      <table class="tank-table">
+        <tr><th colspan="2" style="color:#f59e0b;text-align:left;font-size:1.02em;padding-bottom:6px;">Spezifikation</th></tr>
+        <tr><td class="tank-table-label">Druck (bar)</td><td class="tank-table-value">${getSV(item, [hdrSV.pressure])}</td></tr>
+        <tr><td class="tank-table-label">Einstelldruck</td><td class="tank-table-value">${getSV(item, [hdrSV.pressure_setting])}</td></tr>
+        <tr><td class="tank-table-label">Hersteller</td><td class="tank-table-value">${getSV(item, [hdrSV.manufacturer])}</td></tr>
+      </table>`;
+
+    const rightTable = `
+      <table class="tank-table">
+        <tr><th colspan="2" style="color:#f59e0b;text-align:left;font-size:1.02em;padding-bottom:6px;">Prüfung &amp; Termine</th></tr>
+        <tr><td class="tank-table-label">Zuletzt geprüft</td><td class="tank-table-value">${fmt(getSV(item, [hdrSV.last_checked]))}</td></tr>
+        <tr><td class="tank-table-label">Installiert</td><td class="tank-table-value">${fmt(getSV(item, [hdrSV.installation]))}</td></tr>
+        <tr><td class="tank-table-label">Nächster Wechsel</td><td class="tank-table-value">${fmt(getSV(item, [hdrSV.next_change]))}</td></tr>
+      </table>`;
+
+    const wrapperSV = document.createElement('div'); wrapperSV.style.marginTop='8px';
+    wrapperSV.innerHTML = `<div class="details-row"><div class="details-col">${leftTable}</div><div class="details-col middle">${middleTable}</div><div class="details-col">${rightTable}</div></div>`;
+    parent.appendChild(wrapperSV);
+    return;
+  }
+
+
+  // ----- default rendering for all other groups (unchanged) -----
+  const left=[
+    {label:'Bezeichnung',key:hdr.bezeichnung || hdr.name || 'Bezeichnung'},
+    {label:'Typ',key:hdr.type||'Type'},
+    {label:(grp==='verdampfer')?'Vaporizer ID':'Inventar-Nr.',key:hdr.id||hdr.inventory||'Inventory_Number'},
+    {label:'Fabrikat Nr.',key:hdr.fabrikat||'Fabrikat_Number'},
+    {label:'Equipment Nr.',key:hdr.equipment_number||'Equipment_Number'},
+    {label:'Gasart',key:hdr.gasart||'Gasart'},
+    {label:'Produktnummer',key:hdr.product||'Product_Number'}
+  ];
+  const middle=[
+    {label:'Zul. Betriebsdruck (bar)',key:hdr.zul||'Zul_Betriebsdruck'},
+    {label:'Arbeitsdruck AD (bar)',key:hdr.arbeitsdruck||'Arbeitsdruck'},
+    {label:'Geometr. Behälterinhalt (l)',key:hdr.geometr||'Geometr_Behalterinhalt'},
+    {label:'Hersteller',key:hdr.hersteller||'Hersteller'},
+    {label:'Baujahr',key:hdr.baujahr||'Baujahr'},
+    {label:'Datum Aufstellung',key:hdr.datum_aufstellung||'Datum Aufstellung',format:'de-date'}
+  ];
+  const right=[
+    {label:'Wartung',key:hdr.wartung||'Wartung',format:'year-month'},
+    {label:'Analyse',key:hdr.analyse||'Analyse',format:'year-month'},
+    {label:'wkP Anlage',key:hdr.wkP_Anlage||'wkP_Anlage',format:'year-month'},
+    {label:'wkP Innere',key:hdr.wkP_Innere||'wkP_Innere',format:'year-month'},
+    {label:'wkP Festigkeit',key:hdr.wkP_Festigkeit||'wkP_Festigkeit',format:'year-month'},
+    {label:'Äußere Prüfung',key:hdr.aussere||hdr.AUSSERE_Prufung||'Aussere_Prufung',format:'year-month'},
+    {label:'Elektro-Prüfung',key:hdr.elektro||'Elektro_Prufung',format:'year-month'},
+    {label:'LTPP',key:hdr.ltpp||'LTPP',format:'year-month'}
+  ];
+
+  const leftTable = `<table class="tank-table"><tr><th colspan=2 style="color:#f59e0b;text-align:left;font-size:1.02em;padding-bottom:6px;">${grp[0].toUpperCase()+grp.slice(1)}</th></tr>${
+    left.map(l=>`<tr><td class="tank-table-label">${l.label}</td><td class="tank-table-value">${get(item,[l.key])}</td></tr>`).join('')}</table>`;
+  const middleTable = `<table class="tank-table"><tr><th colspan=2 style="color:#f59e0b;text-align:left;font-size:1.02em;padding-bottom:6px;">${grp[0].toUpperCase()+grp.slice(1)}daten</th></tr>${
+    middle.map(l=>{ let v=get(item,[l.key]); if(l.format) v=fmtDate(v,l.format); return `<tr><td class="tank-table-label">${l.label}</td><td class="tank-table-value">${v}</td></tr>`; }).join('')}</table>`;
+  const rightTable = `<table class="tank-table"><tr><th colspan=2 style="color:#f59e0b;text-align:left;font-size:1.02em;padding-bottom:6px;">Nächste Prüfungen</th></tr>${
+    right.map(l=>{ let v=get(item,[l.key]); if(l.format) v=fmtDate(v,l.format); return `<tr><td class="tank-table-label">${l.label}</td><td class="tank-table-value">${v}</td></tr>`; }).join('')}</table>`;
+
+  const remarks = get(item,[hdr.bemerkungen||'Bemerkungen','Bemerkungen','Bemerkung','notes']);
+  const wrapper=document.createElement('div'); wrapper.style.marginTop='8px';
+  wrapper.innerHTML=`<div class="details-row"><div class="details-col">${leftTable}</div><div class="details-col middle">${middleTable}</div><div class="details-col">${rightTable}</div></div>${
+    remarks?`<div class="details-remarks"><strong>Bemerkungen:</strong><div style="white-space:pre-wrap;margin-top:6px;">${remarks}</div></div>`:''}`;
+  parent.appendChild(wrapper);
+
+  if(grp==='gasmischer' && item.pufferbehalter?.length){
+    const subH=document.createElement('div'); subH.style.marginTop='8px'; subH.innerHTML=`<div style="font-weight:700;color:#334155;margin-top:6px;">Pufferbehälter</div>`; parent.appendChild(subH);
+    item.pufferbehalter.forEach(pb=> renderEquipment(pb,'pufferbehalter', parent));
+  }
+  // Show nested SVs under any equipment type (and tanks too if renderEquipment is called on a tank)
+  if (item.sv?.length && ['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','tanks'].includes(grp)){
+    const subH=document.createElement('div'); subH.style.marginTop='8px'; subH.innerHTML=`<div style="font-weight:700;color:#334155;margin-top:6px;">SV (Sicherheitsventile)</div>`; parent.appendChild(subH);
+    item.sv.forEach(sv=> renderEquipment(sv,'sv', parent));
+  }
+}
+      if(t.equipment){ ['verdampfer','gasmischer','pufferbehalter','froster','tafel','co2','spezial','telemetry','sv'].forEach(grp=>{
+        const arr=t.equipment[grp]||[]; if(!arr.length) return;
+        const gTitle=document.createElement('div'); gTitle.style.marginTop='10px';
+        gTitle.innerHTML=`<div style="color:#f59e0b;font-weight:700;margin-bottom:6px;">${grp[0].toUpperCase()+grp.slice(1)}</div>`;
+        container.appendChild(gTitle); arr.forEach(obj=> renderEquipment(obj,grp,container));
+      }); }
+    });
+  }
+
+  if(custNode){ renderTanksForCustomer(custNode.id, panel); renderChildren(custNode, panel); }
+  else{ panel.innerHTML='<div class="text-muted">Customer not found in tree.</div>'; }
+
+  try{ setTimeout(()=>{ moveResizerToBody(); alignResizerToSidebar(); },80); }catch(e){}
+  try{ setTimeout(()=> ensureResizerListeners(),120); }catch(e){}
+  panel.querySelectorAll('.tank-table-label').forEach(td=> td.style.whiteSpace='normal');
+}
+
+/* ====================== MAINTENANCE TAB ====================== */
+function updateMaintenance(customerIds){
+  const key = selectionKey(customerIds);
+  const same = (key === currentMaintenanceSelectionKey);
+
+  if(same){
+    try{ maintenanceMap?.invalidateSize(); }catch(e){}
+    return;
+  }
+  currentMaintenanceSelectionKey = key;
+
+  if(maintenanceMarkersGroup){
+    try{ maintenanceMap.removeLayer(maintenanceMarkersGroup); }catch(e){}
+    maintenanceMarkersGroup = null;
+  }
+  maintenanceMarkersGroup = L.layerGroup().addTo(maintenanceMap);
+
+  const markers=[]; let rows=[];
+  (customerIds || []).forEach(cid=>{
+    (appData.tanks[cid]||[]).forEach(t=>{
+      rows.push({ customer:cid, id:t.id, next_date:t.next_date, status:t.status, technician:t.technician_name || t.technician_id || 'Unknown' });
+      if(typeof t.latitude==='number' && typeof t.longitude==='number'){
+  const popup = `Tank ${t.id}<br/>Next:${t.next_date||''}<br/>Status:${t.status||''}`;
+  const m = makeDotMarker(t.latitude, t.longitude, t.status).bindPopup(popup);
+        maintenanceMarkersGroup.addLayer(m);
+        markers.push(m);
+      }
+    });
+  });
+
+  fitBoundsIfAny(maintenanceMap, maintenanceMarkersGroup);
+  renderMaintenanceTable(rows);
+}
+function renderMaintenanceTable(rows){
+  const c=document.getElementById('maintenanceTable'); if(!rows.length){ c.innerHTML='<p>No upcoming maintenance.</p>'; return; }
+  let html='<table class="table table-sm table-striped"><thead><tr><th>Customer</th><th>Tank</th><th>Next Date</th><th>Status</th><th>Technician</th></tr></thead><tbody>';
+  rows.forEach(r=>{ html+=`<tr><td>${r.customer}</td><td>${r.id}</td><td>${r.next_date}</td><td>${r.status}</td><td>${r.technician}</td></tr>`; });
+  html+='</tbody></table>'; c.innerHTML=html;
+}
+
+/* ====================== STATS (kept; no charts) ====================== */
+function initStatistics(){ updateStats(); }
+function updateStats(customerIds){
+  const ids=(customerIds&&customerIds.length)? customerIds : Object.keys(appData.tanks||{});
+  // hide pool card by default during normal stats
+  try{ showPoolCard(false); }catch(e){}
+  const globalView=!(customerIds&&customerIds.length);
+  const customersCount=(globalView && appData.totals && typeof appData.totals.customers==='number')? appData.totals.customers : ids.length;
+  const totals={ customers:customersCount, tanks:0 };
+  const typeCounts={ tanks:0, verdampfer:0, gasmischer:0, pufferbehalter:0, froster:0, co2:0, tafel:0, spezial:0, telemetry:0, sv:0 };
+  const cityMap={};
+
+  // note: SV helpers (normalizeSVTypeLabel, collectSVsFromTank) are defined at top-level to
+  // avoid duplication and ensure consistent normalization and collection across the app.
+
+  // Collect unique SVs across selected customers/tanks
+  const svSeen = new Map(); // svId -> svObj
+
+  ids.forEach(cid=>{
+    const tanks=appData.tanks[cid]||[]; totals.tanks+=tanks.length;
+    function findCustomerInfo(id){ let f=null; (function w(n){ Object.values(n||{}).forEach(x=>{ if(x.id===id) f=x; if(!f && x.children) w(x.children); }); })(appData.tree); return f; }
+    const ci=findCustomerInfo(cid); const city=ci?.address?.city? String(ci.address.city).trim(): '';
+    if(!cityMap[city]) cityMap[city]={ customers:new Set(), tanks:0, equipment:{...typeCounts} };
+    cityMap[city].customers.add(cid);
+    tanks.forEach(t=>{
+      cityMap[city].tanks++; typeCounts.tanks++;
+      // capture all SVs for deduping
+      const svList = collectSVsFromTank(t);
+      svList.forEach(sv => { if(sv && sv.id && !svSeen.has(sv.id)) svSeen.set(sv.id, sv); });
+      // Count other equipment groups but skip 'sv' here — we'll count SVs separately
+      Object.keys(typeCounts).forEach(k=>{ if(k==='tanks' || k==='sv') return; const arr=t.equipment?.[k]||[]; const n=Array.isArray(arr)? arr.length:0; typeCounts[k]+=n; cityMap[city].equipment[k]=(cityMap[city].equipment[k]||0)+n; });
+      if(Array.isArray(t.equipment.gasmischer)){ t.equipment.gasmischer.forEach(gm=>{ const p=gm.pufferbehalter?.length||0; typeCounts.pufferbehalter+=p; cityMap[city].equipment.pufferbehalter=(cityMap[city].equipment.pufferbehalter||0)+p; }); }
+      // SV counts will be derived from the unique set (svSeen) after scanning all tanks
+    });
+  });
+
+  // force SV counts to the unique set size to avoid double-counting
+  typeCounts.sv = svSeen.size;
+  // update city totals for equipment.sv by counting how many of the svSeen belong to the city
+  // (we'll compute a simple per-city breakdown by iterating tanks again)
+  Object.keys(cityMap).forEach(cityName=> cityMap[cityName].equipment.sv = 0);
+  svSeen.forEach(sv => {
+    // determine tank/customer for this SV (try sv.raw parent info)
+    const p = sv.raw && sv.raw[COLUMN_HEADERS.SV.parent] ? String(sv.raw[COLUMN_HEADERS.SV.parent]) : null;
+    // if parent is a tank keyed in attachIndex.tanks then find its customer via tanks map
+    let ownerCity = '';
+    try{
+      // search tanks for this SV (cheap but safe for now)
+      for(const cid of Object.keys(appData.tanks||{})){
+        const tlist = appData.tanks[cid]||[];
+        if(tlist.some(t => (t.equipment?.sv||[]).some(x=> String(x.id)===String(sv.id)) || ['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial'].some(g=> (t.equipment?.[g]||[]).some(eq=> (eq.sv||[]).some(x=> String(x.id)===String(sv.id)))) )){ ownerCity = (function findCustomerInfo(id){ let f=null; (function w(n){ Object.values(n||{}).forEach(x=>{ if(x.id===id) f=x; if(!f && x.children) w(x.children); }); })(appData.tree); return f; })(cid)?.address?.city || ''; break; }
+      }
+    }catch(e){}
+    if(!cityMap[ownerCity]) cityMap[ownerCity] = cityMap[ownerCity] || { customers:new Set(), tanks:0, equipment:{...typeCounts} };
+    cityMap[ownerCity].equipment.sv = (cityMap[ownerCity].equipment.sv||0) + 1;
+  });
+
+  const equipmentTotal=Object.values(typeCounts).reduce((s,v)=> s+v,0);
+  const kpiRow=document.getElementById('kpiRow'); kpiRow.innerHTML='';
+  const base = [
+    { label: 'Customers', value: totals.customers },
+    { label: 'Tanks',     value: totals.tanks }
+  ];
+
+  // Do not re-add "Tanks" from typeCounts to avoid duplicating it
+  const kpis = base.concat(
+    Object.keys(typeCounts)
+  .filter(k => k !== 'tanks')
+  .map(k => ({ label: k === 'sv' ? 'SV' : (k[0].toUpperCase() + k.slice(1)), value: typeCounts[k] || 0 }))
+  );
+
+  const table = document.createElement('table');
+  table.className = 'kpi-table kpi-table-compact';
+  table.innerHTML =
+    '<thead><tr><th>Metric</th><th>Count</th></tr></thead>' +
+    '<tbody>' +
+    kpis.map(k => `<tr><td class="small-muted">${k.label}</td><td class="kpi-small">${k.value}</td></tr>`).join('') +
+    '</tbody>';
+  kpiRow.appendChild(table);
+
+  const global=document.getElementById('globalSummary'); if(global){
+    global.innerHTML='';
+    const cl=appData.customerLevels||{ master:0, sub:0, subsub:0 };
+    const b1=document.createElement('div'); b1.className='stat-box'; b1.style.minWidth='180px'; b1.innerHTML=`<div class="stat-title">Customers (master/sub/subsub)</div><div class="stat-value">${cl.master||0} / ${cl.sub||0} / ${cl.subsub||0}</div>`; global.appendChild(b1);
+    const b2=document.createElement('div'); b2.className='stat-box'; b2.style.minWidth='160px'; b2.innerHTML=`<div class="stat-title">Total Customers</div><div class="stat-value">${totals.customers}</div>`; global.appendChild(b2);
+    const b3=document.createElement('div'); b3.className='stat-box'; b3.style.minWidth='160px'; b3.innerHTML=`<div class="stat-title">Total Tanks</div><div class="stat-value">${totals.tanks}</div>`; global.appendChild(b3);
+    const b4=document.createElement('div'); b4.className='stat-box'; b4.style.minWidth='220px'; b4.innerHTML=`<div class="stat-title">Equipment Total</div><div class="stat-value">${equipmentTotal}</div>`; global.appendChild(b4);
+    const pool=appData.pool||{}; const b5=document.createElement('div'); b5.className='stat-box'; b5.style.minWidth='220px'; b5.innerHTML=`<div class="stat-title">Pool customers/tanks</div><div class="stat-value">${(pool.customers||[]).length} / ${(pool.tanks||[]).length}</div>`; global.appendChild(b5);
+  }
+
+  const totalsByType=document.getElementById('totalsByType'); totalsByType.innerHTML='';
+  Object.keys(typeCounts).forEach(k=>{
+    const name = k === 'sv' ? 'SV' : (k[0].toUpperCase()+k.slice(1));
+    const el = document.createElement('div');
+    el.innerHTML = `<strong>${name}</strong>: ${typeCounts[k]||0}`;
+    totalsByType.appendChild(el);
+  });
+
+  const groupStatsEl=document.getElementById('groupStats'); groupStatsEl.innerHTML='';
+  groupStatsEl.classList.add('stat-grid');
+  const groups=Object.keys(typeCounts);
+  // Render each group as a separate tile
+  groups.forEach(g=>{
+    const map={};
+    ids.forEach(cid=>{
+      (appData.tanks[cid]||[]).forEach(t=>{
+        if (g === 'tanks') {
+          const key = String(t.type || 'Unknown').trim(); map[key] = (map[key] || 0) + 1;
+        } else {
+          (t.equipment[g] || []).forEach(it => {
+            const key = String(it.type || it.name || g || 'Unknown').trim(); map[key] = (map[key] || 0) + 1;
+          });
+          if (g === 'pufferbehalter' && Array.isArray(t.equipment.gasmischer)) {
+            t.equipment.gasmischer.forEach(gm => (gm.pufferbehalter || []).forEach(pb => { const key = String(pb.type || pb.name || 'pufferbehalter').trim(); map[key] = (map[key] || 0) + 1; }));
+          }
+          if (g === 'sv') {
+            // SV per-type counting is handled from the deduped svSeen set below.
+          }
+        }
+      });
+    });
+
+    const entries=Object.entries(map).sort((a,b)=> b[1]-a[1]);
+    const total=entries.reduce((s,e)=> s+e[1],0);
+
+    // Special-case SV: build the tile from the deduped svSeen map to avoid double counts
+    if (g === 'sv') {
+      const tile = document.createElement('div'); tile.className='tile';
+      const map2 = {};
+      svSeen.forEach(sv => {
+        const key = svGroupKey(sv.type || sv.name || 'SV');
+        map2[key] = (map2[key] || 0) + 1;
+      });
+      const entries2 = Object.entries(map2).sort((a,b)=> b[1]-a[1]);
+      const title = 'SV';
+      let inner = `<h6>${title} <span class="badge-soft">${typeCounts.sv || 0}</span></h6>`;
+      if (!entries2.length) inner += `<div class="small-muted">No items</div>`;
+      else inner += entries2.slice(0,10).map(([key,count])=> `<div class="pair"><span>${svPrettyLabelFromKey(key)}</span><strong>${count}</strong></div>`).join('');
+      tile.innerHTML = inner; groupStatsEl.appendChild(tile);
+    } else {
+      const tile = document.createElement('div'); tile.className='tile';
+      const title = g[0].toUpperCase() + g.slice(1);
+      let inner = `<h6>${title} <span class="badge-soft">${typeCounts[g] || 0}</span></h6>`;
+      if (!entries.length) inner += `<div class="small-muted">No items</div>`;
+      else inner += entries.slice(0,10).map(([label, count]) => `<div class="pair"><span>${label}</span><strong>${count}</strong></div>`).join('');
+      tile.innerHTML = inner;
+      groupStatsEl.appendChild(tile);
+    }
+  });
+
+  const cityEntries=Object.keys(cityMap).map(c=>({ city:c||'(Unknown)', customers:cityMap[c].customers.size, tanks:cityMap[c].tanks, equipment:cityMap[c].equipment||{} })).sort((a,b)=> b.customers-a.customers).slice(0,10);
+  const topCitiesEl=document.getElementById('topCities'); topCitiesEl.innerHTML='';
+  const groupsOrder=['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'];
+  cityEntries.forEach(ce=>{
+    const equip=ce.equipment||{}; const parts=groupsOrder.map(g=> `${g}: ${equip[g]||0}`);
+    const div=document.createElement('div'); div.innerHTML=`<div><strong>${ce.city}</strong>: ${ce.customers} customers, ${ce.tanks} tanks — ${parts.join(', ')}</div>`; topCitiesEl.appendChild(div);
+  });
+
+  if(ids.length===1){ const cid=ids[0]; const custInfo=(function findCustomer(id){ let f=null; (function w(n){ Object.values(n||{}).forEach(x=>{ if(x.id===id) f=x; if(!f && x.children) w(x.children); }); })(appData.tree); return f; })(cid);
+    const detail=document.getElementById('detailStats'); if(detail) renderCustomerDetailedStats(cid, detail, custInfo);
+  }else{ const detail=document.getElementById('detailStats'); if(detail) detail.innerHTML=''; }
+}
+function renderCustomerDetailedStats(customerId, container, custInfo){
+  const tanks=appData.tanks[customerId]||[];
+  const eqGroups=['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'];
+  const counts={ tanks:tanks.length }; const typeBuckets={}; eqGroups.forEach(g=>{ counts[g]=0; typeBuckets[g]={}; });
+  tanks.forEach(t=>{
+    // count equipment groups; when the group is 'sv' normalize the SV labels
+    Object.keys(t.equipment||{}).forEach(g=>{ const arr=t.equipment[g]||[]; counts[g]+=arr.length; arr.forEach(it=>{ let tn = it.type||it.Type||it.name||g||'Unknown'; if(g==='sv') tn = normalizeSVTypeLabel(it.type||it.name||'sv'); typeBuckets[g][tn]=(typeBuckets[g][tn]||0)+1; }); });
+    // keep existing pufferbehalter counting under gasmischer
+    if(Array.isArray(t.equipment.gasmischer)){ t.equipment.gasmischer.forEach(gm=> (gm.pufferbehalter||[]).forEach(pb=>{ counts.pufferbehalter++; const tn=pb.type||pb.name||'pufferbehalter'; typeBuckets.pufferbehalter[tn]=(typeBuckets.pufferbehalter[tn]||0)+1; })); }
+    // count SVs nested under ANY equipment group (avoid double-counting tank-level t.equipment.sv which
+    // was already counted above in the 'sv' group). This ensures all nested SVs are included in counts and
+    // that their type labels are normalized.
+    ['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial'].forEach(g=>{
+      (t.equipment[g]||[]).forEach(it=>{
+        (it.sv||[]).forEach(sv=>{
+          counts.sv++;
+          const tn = normalizeSVTypeLabel(sv.type || sv.name || 'sv');
+          typeBuckets.sv[tn] = (typeBuckets.sv[tn]||0)+1;
+        });
+      });
+    });
+  });
+  let html = `<h4>${custInfo?.name||'Customer'} - Detailed Stats</h4>`;
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:8px;">';
+  html += `<div class="stat-card"><h5>Overview</h5><p>Tanks: <strong>${counts.tanks}</strong></p>${Object.keys(typeBuckets).map(g=> `<p>${g[0].toUpperCase()+g.slice(1)}: <strong>${counts[g]||0}</strong></p>`).join('')}</div>`;
+  Object.keys(typeBuckets).forEach(g=>{
+    const entries=Object.entries(typeBuckets[g]).sort((a,b)=> b[1]-a[1]); const total=entries.reduce((s,e)=> s+e[1],0);
+    html += `<div class="stat-card"><h5>${g[0].toUpperCase()+g.slice(1)} Types</h5>${!entries.length? '<p>No items</p>' : entries.slice(0,10).map(([tn,c])=> `<p>${tn}: <strong>${c}</strong> (${((c/total)*100).toFixed(1)}%)</p>`).join('')}</div>`;
+  });
+  const statusMap={}; tanks.forEach(t=>{ const s=t.status||'Unknown'; statusMap[s]=(statusMap[s]||0)+1; });
+  html+=`<div class="stat-card"><h5>Tank Status</h5>${Object.entries(statusMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=> `<p>${k}: <strong>${v}</strong></p>`).join('')}</div>`;
+  html+=`<div class="stat-card"><h5>Customer</h5><p>City: <strong>${custInfo?.address?.city||'N/A'}</strong></p><p>ID: <strong>${customerId}</strong></p></div>`;
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+/* ====================== POOL PREVIEW ====================== */
+function updatePoolStats(group){
+  const pool=appData.pool||{};
+  const groups=['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'];
+  const kpiRow=document.getElementById('kpiRow'); if(kpiRow) kpiRow.innerHTML='';
+  const table=document.createElement('table'); table.className='kpi-table';
+  let tb='<tbody>'; const pc=(pool.customers||[]).length, pt=(pool.tanks||[]).length;
+  tb += `<tr><td class="small-muted">Pool (orphan customers)</td><td class="kpi-small">${pc}</td></tr>`;
+  tb += `<tr><td class="small-muted">Pool Tanks</td><td class="kpi-small">${pt}</td></tr>`;
+  groups.forEach(g=>{ const cnt=(pool[g]||[]).length; if(!group || group===g) tb += `<tr><td class="small-muted">${g[0].toUpperCase()+g.slice(1)}</td><td class="kpi-small">${cnt}</td></tr>`; });
+  table.innerHTML='<thead><tr><th>Metric</th><th>Count</th></tr></thead>'+tb+'</tbody>';
+  if(kpiRow) kpiRow.appendChild(table);
+  const groupStatsEl=document.getElementById('groupStats'); if(groupStatsEl) groupStatsEl.innerHTML='';
+  if(group){
+    const arr=pool[group]||[]; const map={}; arr.forEach(it=>{ const key=String(it.type||it.Type||it.name||group).trim(); map[key]=(map[key]||0)+1; });
+    Object.entries(map).sort((a,b)=> b[1]-a[1]).slice(0,10).forEach(([label,count])=>{ const div=document.createElement('div'); div.innerHTML=`<div><strong>${label}</strong>: ${count}</div>`; groupStatsEl.appendChild(div); });
+  }
+  const detail=document.getElementById('detailStats'); if(detail) detail.innerHTML='';
+  // show pool card when pool stats are requested
+  try{ showPoolCard(true); renderPoolPreview(); }catch(e){}
+}
+function renderPoolPreview(){
+  const preview=document.getElementById('poolPreview'); if(!preview) return;
+  const pool=appData.pool||{}; preview.innerHTML='';
+  const groups=Object.keys(pool).filter(k=> ['customers','tanks','verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'].includes(k));
+  groups.forEach(g=>{
+    const arr=pool[g]||[]; const div=document.createElement('div'); div.innerHTML=`<strong>${g}</strong>: ${arr.length}`; preview.appendChild(div);
+    const list=document.createElement('div'); list.style.marginLeft='8px';
+    arr.slice(0,10).forEach(it=>{ const itLabel=it.name||it.Type||it.id||it.id; const el=document.createElement('div'); el.innerText=`- ${itLabel} (${it.id||''})`; el.style.fontSize='.85rem'; list.appendChild(el); });
+    preview.appendChild(list);
+  });
+}
+
+/* ====================== RESIZER ====================== */
+const resizerEl=document.getElementById('resizer'); let resizing=false;
+resizerEl.addEventListener('pointerdown',(e)=>{ resizing=true; try{ resizerEl.setPointerCapture?.(e.pointerId); }catch(err){} document.body.style.cursor='ew-resize'; e.preventDefault(); });
+document.addEventListener('pointermove',(e)=>{
+  if(!resizing) return;
+  const wrapper=document.querySelector('.wrapper'); const wrect=wrapper? wrapper.getBoundingClientRect(): { left:0 };
+  const min=200, max=Math.min(window.innerWidth-400, 1200);
+  const rawX = typeof e.clientX==='number'? e.clientX : (e.touches?.[0]?.clientX)||0;
+  const rel=Math.round(rawX - wrect.left); const newW=Math.max(min, Math.min(max, rel));
+  document.documentElement.style.setProperty('--sidebar-width', `${newW}px`);
+  try{ alignResizerToSidebar(); }catch(e){}
+  setTimeout(()=>{ try{ customerMap?.invalidateSize(); maintenanceMap?.invalidateSize(); plannerMap?.invalidateSize(); }catch(e){} }, 60);
+  e.preventDefault();
+},{ passive:false });
+resizerEl.addEventListener('click',(e)=>{
+  const wrapper=document.querySelector('.wrapper'); const wrect=wrapper? wrapper.getBoundingClientRect(): { left:0 };
+  const min=200, max=Math.min(window.innerWidth-400, 1200);
+  const rel=Math.round((e.clientX||0) - wrect.left); const newW=Math.max(min, Math.min(max, rel));
+  document.documentElement.style.setProperty('--sidebar-width', `${newW}px`);
+  try{ alignResizerToSidebar(); }catch(e){}
+  setTimeout(()=>{ try{ customerMap?.invalidateSize(); maintenanceMap?.invalidateSize(); plannerMap?.invalidateSize(); }catch(e){} }, 80);
+});
+document.addEventListener('pointerup',(e)=>{ if(resizing){ resizing=false; try{ resizerEl.releasePointerCapture?.(e.pointerId); }catch(err){} document.body.style.cursor='default'; } });
+function ensureResizerListeners(){
+  try{
+    const r=document.getElementById('resizer'); if(!r || r.dataset.resizerReady==='1') return;
+    r.style.cursor='ew-resize'; r.style.touchAction='none'; r.style.pointerEvents='auto'; r.style.zIndex=r.style.zIndex||'2147483647';
+    const start=(e)=>{ resizing=true; try{ r.setPointerCapture?.(e.pointerId); }catch(err){} document.body.style.cursor='ew-resize'; e.preventDefault?.(); };
+    r.addEventListener('pointerdown',start,{passive:false}); r.addEventListener('mousedown',start,{passive:false}); r.addEventListener('touchstart',start,{passive:false});
+    r.addEventListener('click',(ev)=>{ const wrapper=document.querySelector('.wrapper'); const wrect=wrapper? wrapper.getBoundingClientRect(): { left:0 }; const min=200, max=Math.min(window.innerWidth-400, 1200);
+      const rel=Math.round((ev.clientX||0) - wrect.left); const newW=Math.max(min, Math.min(max, rel));
+      document.documentElement.style.setProperty('--sidebar-width', `${newW}px`); alignResizerToSidebar(); });
+    r.dataset.resizerReady='1';
+  }catch(e){}
+}
+function positionResizerFromVar(){ try{ const w=getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width').trim(); if(w) document.getElementById('resizer').style.left=`calc(${w} - 6px)`; }catch(e){} }
+window.addEventListener('resize', positionResizerFromVar);
+setTimeout(positionResizerFromVar, 50);
+function moveResizerToBody(){
+  try{
+    const r=document.getElementById('resizer'); if(!r) return;
+    if(r.parentElement!==document.body){ document.body.appendChild(r); r.style.position='fixed'; r.style.zIndex='2147483647'; r.style.touchAction='none'; r.style.pointerEvents='auto'; r.style.background=r.style.background||'rgba(15,23,42,0.06)'; }
+    alignResizerToSidebar(); ensureResizerListeners(); r.style.display='block';
+  }catch(e){}
+}
+document.addEventListener('DOMContentLoaded', moveResizerToBody); window.addEventListener('resize', moveResizerToBody);
+function alignResizerToSidebar(){
+  try{
+    const sidebar=document.querySelector('.sidebar'); const r=document.getElementById('resizer'); if(!sidebar||!r) return;
+    const s=sidebar.getBoundingClientRect(); r.style.position='fixed'; r.style.zIndex='99999';
+    const leftPx=Math.max(0, Math.round(s.right - 6)); const topPx=Math.max(0, Math.round(s.top)); const heightPx=Math.max(0, Math.round(s.height));
+    r.style.left=`${leftPx}px`; r.style.top=`${topPx}px`; r.style.height=`${heightPx}px`;
+  }catch(e){}
+}
+function applySidebarSettingsForActiveTab(){ try{ moveResizerToBody(); alignResizerToSidebar(); ensureResizerListeners(); positionResizerFromVar(); setTimeout(()=>{ try{ customerMap?.invalidateSize(); maintenanceMap?.invalidateSize(); plannerMap?.invalidateSize(); }catch(e){} }, 80); }catch(e){} }
+
+/* apply on tab switch */
+if(window.jQuery){
+  $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e){
+    const target = e.target.getAttribute('data-bs-target');
+    setTimeout(()=>{ applySidebarSettingsForActiveTab(target); if(target==='#tab-planner') onPlannerTabShown(); }, 80);
+  });
+}else{
+  document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ const target=btn.getAttribute('data-bs-target'); setTimeout(()=>{ applySidebarSettingsForActiveTab(target); if(target==='#tab-planner') onPlannerTabShown(); }, 120); });
+  });
+}
+/* initial */
+setTimeout(()=>{ const activeBtn=document.querySelector('button[data-bs-toggle="tab"].active')||document.querySelector('button[data-bs-toggle="tab"]'); const tgt=activeBtn? (activeBtn.getAttribute('data-bs-target')): null; applySidebarSettingsForActiveTab(tgt); },120);
+
+/* ====================== PLANNER (NEW) ====================== */
+let plannerJobs=[];             // computed jobs
+let plannerInstallations = [];
+let plannerTechMap={};          // id -> name
+let plannerRegionIndex={};      // customerId -> regionId
+let plannerRegionName={};       // regionId -> regionName
+
+function getTechnicianMap(){
+  const m={}; (appData.technicians||[]).forEach(t=> m[String(t.id)]=t.name||t.id); return m;
+}
+function parseSheetDate(v){
+  if(v===null || v===undefined || v==='') return null;
+
+  // Native Date
+  if(v instanceof Date && !isNaN(v)) return v;
+
+  // Excel serial number (1900 system). Accept anything >= 60 (skip the fake-leap-day region)
+  if(typeof v === 'number' && isFinite(v)){
+    const base = new Date(Date.UTC(1899,11,30));
+    const d = new Date(base.getTime() + v*86400000);
+    if(!isNaN(d)) return d;
+  }
+
+  if(typeof v === 'string'){
+    const s = v.trim();
+
+    // Common full-date patterns
+    // DD.MM.YYYY
+    let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if(m) return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+    // DD/MM/YYYY
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(m) return new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+    // YYYY-MM-DD or YYYY/MM/DD
+    m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+    if(m) return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+
+    // Year-month patterns (month granularity)
+    // YYYY-MM or YYYY/MM or YYYY.MM or "YYYY MM"
+    m = s.match(/^(\d{4})[.\-\/ ](\d{1,2})$/);
+    if(m) return new Date(Number(m[1]), Number(m[2])-1, 1);
+    // MM-YYYY or MM/YYYY or MM.YYYY or "MM YYYY"
+    m = s.match(/^(\d{1,2})[.\-\/ ](\d{4})$/);
+    if(m) return new Date(Number(m[2]), Number(m[1])-1, 1);
+
+    // Fallback to Date.parse
+    const d = new Date(s);
+    if(!isNaN(d)) return d;
+  }
+  return null;
+}
+
+// small helper to escape HTML when injecting user-provided strings into innerHTML
+function escapeHtml(s){
+  if(s==null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function formatMonth(d){ if(!d) return ''; const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); return `${m}-${y}`; }
+function formatDeDate(d){ if(!d) return ''; return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
+function horizonStatus(d){
+  if(!d) return 'green';
+  const now=new Date(); const startThisMonth=new Date(now.getFullYear(), now.getMonth(), 1);
+  const endPlus3 = new Date(startThisMonth.getFullYear(), startThisMonth.getMonth()+4, 0); // end of month 3 ahead
+  if(d < startThisMonth) return 'red';            // last month or older
+  if(d <= endPlus3) return 'pink';                // current month .. +3 months
+  return 'green';                                  // after 3 months
+}
+function buildRegionIndexMaps(){
+  plannerRegionIndex={}; plannerRegionName={};
+  (function walk(node, currentRegionId, currentRegionName){
+    Object.values(node||{}).forEach(n=>{
+      let rId=currentRegionId, rName=currentRegionName;
+      if(n.type==='region'){ rId=n.id; rName=n.name||n.id; plannerRegionName[rId]=rName; }
+      if(['master','sub','subsub'].includes(n.type)){ plannerRegionIndex[n.id]=rId||'Unknown'; }
+      if(n.children) walk(n.children, rId, rName);
+    });
+  })(appData.tree, null, null);
+}
+
+  /* ===== Planner helper functions: technicians, skills, bundling, SV pre-reqs, routing ===== */
+
+  function parseSkills(cell){
+    if(!cell) return [];
+    return String(cell).split(/[,;\|\/]/).map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase());
+  }
+
+  function loadTechnicians(rawTechs){
+    // rawTechs: array of objects from sheet; normalize into appData.technicians
+    if(!Array.isArray(rawTechs)) return;
+    const parsed = rawTechs.map(r=>{
+      const skills = parseSkills(r.skills||r.Skills||r.role||r.Role);
+      const lat = parseFloat(r.latitude || r.lat || r.home_lat) || null;
+      const lon = parseFloat(r.longitude || r.lon || r.home_lon) || null;
+      return {
+        id: r.id || r.ID || r.Name || (r.name||Math.random().toString(36).slice(2,8)),
+        name: r.name || r.Name || r.id || r.ID || 'Unknown',
+        role: r.role || r.Role || null,
+        skills: skills,
+        home: (lat && lon) ? { lat, lon } : null,
+        capacity: Number(r.capacity||r.Capacity||r.max_jobs) || null
+      };
+    });
+    appData.technicians = parsed;
+    plannerTechMap = getTechnicianMap();
+  }
+
+  function markHospitalCustomers(){
+    // Populate appData.hospitalCustomers set by heuristics on customer name
+    appData.hospitalCustomers = appData.hospitalCustomers || new Set();
+    Object.keys(appData.tanks || {}).forEach(cid=>{
+      const node = findCustomerNodeById(appData.tree, cid);
+      const name = (node?.name||'').toLowerCase();
+      if(/klin|kran|hospital|kranken|lo[xs]|clinic/.test(name)) appData.hospitalCustomers.add(cid);
+    });
+  }
+
+  function jobSkills(job){
+    // derive minimal requiredSkills from jobType and objectType
+    const s=[];
+    const jt=String(job.jobType||'').toLowerCase();
+    const ot=String(job.objectType||'').toLowerCase();
+    if(jt.includes('analyse')) s.push('analyse');
+    if(jt.includes('wartung')||jt.includes('installation')) s.push('wartung');
+    if(jt.includes('elektro')||jt.includes('elektr')) s.push('elektro');
+    if(jt.includes('ltpp')) s.push('ltpp');
+    if(jt.includes('wk')||jt.includes('wkp')||jt.includes('wk p')||jt.includes('wkP')) s.push('wkp');
+    if(jt.includes('next change')||jt.includes('next_change')||jt.includes('next')) s.push('sv');
+    // object-type hints
+    if(ot==='sv' || jt.includes('sv')) s.push('sv');
+    if(ot==='verdampfer') s.push('verdampfer');
+    return Array.from(new Set(s));
+  }
+
+  function ensureSvBeforeWkp(){
+    // Ensure any wKP job has an SV Next Change job scheduled before it for the same tank.
+    const svJobsByTank = {};
+    plannerJobs.forEach(j=>{ if(String(j.objectType||'').toLowerCase()==='sv' && String(j.jobType||'').toLowerCase().includes('next')){ svJobsByTank[j.tankId]=svJobsByTank[j.tankId]||[]; svJobsByTank[j.tankId].push(j); } });
+    // For each wKP job, ensure SVs exist before it
+    const wkps = plannerJobs.filter(j=> String(j.jobType||'').toLowerCase().includes('wkp'));
+    wkps.forEach(wk=>{
+      const tankId = wk.tankId;
+      const svs = svJobsByTank[tankId] || [];
+      if(svs.length){
+        // if any SV dueDate is on/after wkp, move it to one day before wkp
+        svs.forEach(sj=>{ if(+sj.dueDate >= +wk.dueDate){ const nd = new Date(wk.dueDate); nd.setDate(nd.getDate()-1); sj.dueDate = nd; } });
+      } else {
+        // no explicit SV job — if tank has SV entries in source data, create a placeholder Next Change
+        const tanks = appData.tanks[wk.customerId]||[]; const tank = tanks.find(tt=>tt.id==tankId);
+        const hasSv = tank && Object.values(tank.equipment||{}).some(arr=> Array.isArray(arr) && arr.some(it=>it && (it.type||it.name||'').toLowerCase().includes('sv')));
+        if(hasSv){
+          const nd = new Date(wk.dueDate); nd.setDate(nd.getDate()-1);
+          const fake = {
+            objectType:'sv', jobType:'Next Change', dueDate:nd, status:horizonStatus(nd),
+            customerId:wk.customerId, customerName:wk.customerName, customerCode:wk.customerCode, customerCity: wk.customerCity || '',
+            regionId:wk.regionId, regionName:wk.regionName,
+            tankId:tankId, tankInv:wk.tankInv, objectId:`sv-inferred-${wk.tankId}-${+nd}`, label:`SV (inferred)`,
+            technicianId:wk.technicianId, technicianName:wk.technicianName, lat:wk.lat, lon:wk.lon
+          };
+          plannerJobs.push(fake);
+        }
+      }
+    });
+    // resort
+    plannerJobs.sort((a,b)=> a.dueDate - b.dueDate);
+  }
+
+  function bundleJobs(){
+    // Simple bundling: group jobs by customer + month and attach bundleKey and unionSkills
+    const bundles = {};
+    plannerJobs.forEach(j=>{
+      const key = `${j.customerId}::${formatMonth(j.dueDate)}`;
+      bundles[key]=bundles[key]||{ key, jobs:[], skills:new Set(), customerId:j.customerId };
+      bundles[key].jobs.push(j);
+      (j.requiredSkills||[]).forEach(sk=> bundles[key].skills.add(sk));
+      j.bundleKey = key;
+    });
+    // attach unionSkills
+    Object.values(bundles).forEach(b=>{ const arr=Array.from(b.skills); b.jobs.forEach(j=> j.unionSkills = arr); });
+    window.plannerBundles = bundles; // expose for UI
+  }
+
+  function haversineKm(a,b){
+    if(!a||!b) return 99999; const R=6371; const toRad=(x)=>x*Math.PI/180; const dLat=toRad(b.lat-a.lat); const dLon=toRad(b.lon-a.lon);
+    const lat1=toRad(a.lat), lat2=toRad(b.lat);
+    const sinDlat=Math.sin(dLat/2), sinDlon=Math.sin(dLon/2);
+    const c=2*Math.asin(Math.sqrt(sinDlat*sinDlat + Math.cos(lat1)*Math.cos(lat2)*sinDlon*sinDlon));
+    return R*c;
+  }
+
+  function routeNearestNeighbor(jobs, start){
+    // jobs: array of items with lat/lon; start: {lat,lon} or null
+    const remaining = jobs.slice(); const route=[]; let cur = start || remaining.shift(); if(!cur && remaining.length) cur = remaining.shift();
+    while(remaining.length){
+      let bestIdx=0, bestD=Infinity;
+      for(let i=0;i<remaining.length;i++){ const j=remaining[i]; const d=haversineKm(cur, {lat:j.lat, lon:j.lon}); if(d<bestD){ bestD=d; bestIdx=i; } }
+      const n = remaining.splice(bestIdx,1)[0]; route.push(n); cur = {lat:n.lat, lon:n.lon};
+    }
+    return route;
+  }
+
+
+function buildPlannerJobs(){
+  plannerTechMap = getTechnicianMap();
+  buildRegionIndexMaps();
+  plannerJobs=[];
+
+  const JOB_KEYS=['Wartung','Analyse','wkP Anlage','wkP Innere','wkP Festigkeit','Äußere Prüfung','Elektro-Prüfung','LTPP','Next Change'];
+  const headerByGroup={
+    tanks:       { map:COLUMN_HEADERS.Tanks,       keys:{ 'Wartung':'wartung','Analyse':'analyse','wkP Anlage':'wkP_Anlage','wkP Innere':'wkP_Innere','wkP Festigkeit':'wkP_Festigkeit','Äußere Prüfung':'aussere','Elektro-Prüfung':'elektro','LTPP':'ltpp' } },
+    verdampfer:  { map:COLUMN_HEADERS.Verdampfer,  keys:{ 'Wartung':'Wartung','Analyse':'Analyse','wkP Anlage':'wkP_Anlage','wkP Innere':'wkP_Innere','wkP Festigkeit':'wkP_Festigkeit','Äußere Prüfung':'Aussere_Prufung','Elektro-Prüfung':'Elektro_Prufung','LTPP':'LTPP' } },
+    gasmischer:  { map:COLUMN_HEADERS.Gasmischer,  keys:{ 'Wartung':'Wartung','Analyse':'Analyse','wkP Anlage':'wkP_Anlage','wkP Innere':'wkP_Innere','wkP Festigkeit':'wkP_Festigkeit','Äußere Prüfung':'Aussere_Prufung','Elektro-Prüfung':'Elektro_Prufung','LTPP':'LTPP'} },
+    pufferbehalter:{ map:COLUMN_HEADERS.Pufferbehalter, keys:{ 'Wartung':'Wartung','Analyse':'Analyse','wkP Anlage':'wkP_Anlage','wkP Innere':'wkP_Innere','wkP Festigkeit':'wkP_Festigkeit','Äußere Prüfung':'Aussere_Prufung','Elektro-Prüfung':'Elektro_Prufung','LTPP':'LTPP'} },
+    froster:     { map:COLUMN_HEADERS.Froster,     keys:{ 'Wartung':'Wartung','Analyse':'Analyse','wkP Anlage':'wkP_Anlage','wkP Innere':'wkP_Innere','wkP Festigkeit':'wkP_Festigkeit','Äußere Prüfung':'Aussere_Prufung','Elektro-Prüfung':'Elektro_Prufung','LTPP':'LTPP' } },
+    co2:         { map:COLUMN_HEADERS.CO2,         keys:{ 'Wartung':'Wartung','Analyse':'Analyse','wkP Anlage':'wkP_Anlage','wkP Innere':'wkP_Innere','wkP Festigkeit':'wkP_Festigkeit','Äußere Prüfung':'Aussere_Prufung','Elektro-Prüfung':'Elektro_Prufung','LTPP':'LTPP' } },
+    tafel:       { map:COLUMN_HEADERS.Tafel,       keys:{  } },
+    spezial:     { map:COLUMN_HEADERS.Spezial,     keys:{ } },
+    telemetry:   { map:COLUMN_HEADERS.Telemetry,   keys:{ } },
+  sv:          { map:COLUMN_HEADERS.SV,          keys:{ 'Next Change':'next_change', 'Installation Date':'installation' } }
+  };
+
+  // go through each customer and tank
+  Object.entries(appData.tanks||{}).forEach(([cid,tankList])=>{
+    const custNode=findCustomerNodeById(appData.tree,cid);
+    const customerName=custNode?.name || cid;
+    const customerCode=getCustomerCode(custNode);
+    const customerCity = custNode?.address?.city || '';
+    const regId=plannerRegionIndex[cid] || 'Unknown';
+    const regName=plannerRegionName[regId] || 'Unknown';
+
+    tankList.forEach(t=>{
+      const baseLat=t.latitude||null, baseLon=t.longitude||null;
+  const tankInv = t.raw?.[COLUMN_HEADERS.Tanks.inventory] || '';
+  // Prefer Technician Name stored on tank; if none, attempt legacy id; else "Unknown"
+  const techName = t.technician_name || (t.raw?.[COLUMN_HEADERS.Tanks.technician_name]) || '';
+  const techId   = t.technician_id || (t.raw?.[COLUMN_HEADERS.Tanks.technician]) || techName || '';
+
+      // TANK jobs
+      const tankKeys=headerByGroup.tanks.keys;
+      Object.entries(tankKeys).forEach(([jobLabel,propKey])=>{
+        const colName = COLUMN_HEADERS.Tanks[propKey] || propKey;
+        const rawVal  = t.raw ? t.raw[colName] : null;
+        const d = parseSheetDate(rawVal);
+        if(d){
+          plannerJobs.push({
+            objectType:'tanks', jobType:jobLabel, dueDate:d, status:horizonStatus(d),
+            customerId:cid, customerName, customerCode, customerCity,
+            regionId:regId, regionName:regName,
+            tankId:t.id, tankInv,
+            objectId:t.id, label: t.name || `Tank ${t.id}`,
+            technicianId: String(techId || techName || 'Unknown'),
+            technicianName: String(techName || 'Unknown'),
+            lat:baseLat, lon:baseLon
+          });
+        }
+      });
+
+      // EQUIPMENT groups
+      const groups=['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'];
+      groups.forEach(g=>{
+        const arr=t.equipment[g]||[]; if(!arr.length) return;
+        const header=headerByGroup[g]; const map=header?.map||{}; const keys=header?.keys||{};
+        arr.forEach(item=>{
+          const invFromItem = item.raw?.[map.inventory] || tankInv; // show tank inventory in table as requested
+          const objLabel = item.name || item.type || `${g} ${item.id}`;
+          const objTechName = techName; // inherit from tank
+          const objTechId   = techId;   // inherit from tank
+          // planned date fields
+          Object.entries(keys).forEach(([jobLabel,colKeyName])=>{
+            const colName = map[colKeyName] || colKeyName;
+            const rawVal  = item.raw ? item.raw[colName] : null;
+            const d = parseSheetDate(rawVal);
+            if(d){
+              plannerJobs.push({
+                objectType:g, jobType:jobLabel, dueDate:d, status:horizonStatus(d),
+                customerId:cid, customerName, customerCode, customerCity,
+                regionId:regId, regionName:regName,
+                tankId:t.id, tankInv:invFromItem,
+                objectId:item.id, label:objLabel,
+                technicianId: String(objTechId || objTechName || 'Unknown'),
+                technicianName: String(objTechName || 'Unknown'),
+                lat:baseLat, lon:baseLon
+              });
+            }
+          });
+
+          // special nested: puffer under gasmischer already handled in data (their own jobs above)
+          // NEW: for any non-'sv' group, pull jobs from nested SVs
+          if (g !== 'sv' && Array.isArray(item.sv) && item.sv.length){
+            const mapSV = headerByGroup.sv.map, svKeys = headerByGroup.sv.keys;
+            item.sv.forEach(sv=>{
+              Object.entries(svKeys).forEach(([jobLabel, colKeyName])=>{
+                const colName = mapSV[colKeyName] || colKeyName;
+                const rawVal  = sv.raw ? sv.raw[colName] : null;
+                const d = parseSheetDate(rawVal);
+                if(d){
+                  plannerJobs.push({
+                    objectType:'sv', jobType:jobLabel, dueDate:d, status:horizonStatus(d),
+                    customerId:cid, customerName, customerCode, customerCity,
+                    regionId:regId, regionName:regName,
+                    tankId:t.id, tankInv, objectId:sv.id, label: (sv.name || `SV ${sv.id}`) + ` (an ${objLabel})`,
+                    technicianId: String(techId || techName || 'Unknown'),
+                    technicianName: String(techName || 'Unknown'),
+                    lat:baseLat, lon:baseLon
+                  });
+                }
+              });
+            });
+          }
+        });
+      });
+    });
+  });
+
+  // sort by due date
+  plannerJobs.sort((a,b)=> a.dueDate - b.dueDate);
+
+  // mark hospital customers set (heuristic)
+  try{ markHospitalCustomers(); }catch(e){}
+
+  // annotate jobs with requiredSkills and hospitalSite flag
+  plannerJobs.forEach(j=>{
+    try{ j.requiredSkills = jobSkills(j); }catch(e){ j.requiredSkills = []; }
+    try{ j.hospitalSite = !!(appData.hospitalCustomers && appData.hospitalCustomers.has && appData.hospitalCustomers.has(j.customerId)); }catch(e){ j.hospitalSite = false; }
+  });
+
+  // enforce SV before wKP where needed
+  try{ ensureSvBeforeWkp(); }catch(e){}
+
+  // create simple bundles by customer+month and attach unionSkills
+  try{ bundleJobs(); }catch(e){}
+}
+
+function buildInstallationJobs(){
+  plannerInstallations = [];
+  buildRegionIndexMaps();
+  plannerTechMap = getTechnicianMap();
+
+  Object.entries(appData.tanks || {}).forEach(([cid, tankList])=>{
+    const custNode = findCustomerNodeById(appData.tree, cid);
+    const customerName = custNode?.name || cid;
+    const customerCode = getCustomerCode(custNode);
+  const customerCity = custNode?.address?.city || '';
+    const regId = plannerRegionIndex[cid] || 'Unknown';
+    const regName = plannerRegionName[regId] || 'Unknown';
+
+    tankList.forEach(t=>{
+      const baseLat=t.latitude||null, baseLon=t.longitude||null;
+      const tankInv = t.raw?.[COLUMN_HEADERS.Tanks.inventory] || '';
+  const techName = t.technician_name || (t.raw?.[COLUMN_HEADERS.Tanks.technician_name]) || '';
+  const techId   = t.technician_id || (t.raw?.[COLUMN_HEADERS.Tanks.technician]) || techName || '';
+
+      // Tank installation
+      const tankInstallRaw = t.raw ? t.raw[COLUMN_HEADERS.Tanks.datum_aufstellung] : null;
+      const dTank = parseSheetDate(tankInstallRaw);
+      if(dTank){
+        plannerInstallations.push({
+          objectType:'tanks', jobType:'Installation', dueDate:dTank, status:'install',
+          customerId:cid, customerName, customerCode, customerCity,
+          regionId:regId, regionName:regName,
+          tankId:t.id, tankInv, objectId:t.id, label: t.name || `Tank ${t.id}`,
+          technicianId: String(techId || techName || 'Unknown'), technicianName: String(techName || 'Unknown'),
+          lat:baseLat, lon:baseLon
+        });
+      }
+
+      // Equipment installations
+      const groups=['verdampfer','gasmischer','pufferbehalter','froster','co2','tafel','spezial','telemetry','sv'];
+      groups.forEach(g=>{
+        (t.equipment[g]||[]).forEach(item=>{
+          const map = COLUMN_HEADERS[(g==='co2')?'CO2':(g==='sv'?'SV':g[0].toUpperCase()+g.slice(1))] || {};
+          const installCol = (g==='sv') ? map.installation : (map.datum_aufstellung || 'Datum Aufstellung');
+          const raw = item.raw ? item.raw[installCol] : null;
+          const d = parseSheetDate(raw);
+          if(d){
+            plannerInstallations.push({
+              objectType:g, jobType:'Installation', dueDate:d, status:'install',
+              customerId:cid, customerName, customerCode, customerCity,
+              regionId:regId, regionName:regName,
+              tankId:t.id, tankInv: item.raw?.[map.inventory] || tankInv,
+              objectId:item.id, label: item.name || item.type || `${g} ${item.id}`,
+              technicianId: String(techId || techName || 'Unknown'),
+              technicianName: String(techName || 'Unknown'),
+              lat:baseLat, lon:baseLon
+            });
+          }
+        });
+      });
+    });
+  });
+
+  // Sort by date ascending by default
+  plannerInstallations.sort((a,b)=> a.dueDate - b.dueDate);
+}
+
+
+function ensurePlannerMap(){
+  if(plannerMap) { plannerMap.invalidateSize(); return; }
+  plannerMap = L.map('plannerMap').setView([51.1657,10.4515],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap contributors' }).addTo(plannerMap);
+}
+
+function getPlannerFilters(){
+  const mFrom=document.getElementById('pl-from').value;
+  const mTo  =document.getElementById('pl-to').value;
+  const types=Array.from(document.getElementById('pl-types').selectedOptions).map(o=>o.value);
+  const jobs =Array.from(document.getElementById('pl-jobs').selectedOptions).map(o=>o.value);
+  const techs=Array.from(document.getElementById('pl-techs').selectedOptions).map(o=>o.value);
+  const regions=Array.from(document.getElementById('pl-regions').selectedOptions).map(o=>o.value);
+  const overdueOnly=document.getElementById('pl-overdue-only').checked;
+  const installationsOnly = document.getElementById('pl-installations-only')?.checked || false;
+  let from=null, to=null;
+  if(mFrom){ const [y,m]=mFrom.split('-').map(Number); from=new Date(y, m-1, 1); }
+  if(mTo){   const [y,m]=mTo.split('-').map(Number); to=new Date(y, m, 0); }
+  return { from, to, types, jobs, techs, regions, overdueOnly, installationsOnly };
+}
+
+function filterJobs(all,f){
+  return all.filter(j=>{
+    // Basic categorical filters
+    if(f.types.length && !f.types.includes(j.objectType)) return false;
+    // When in installationsOnly mode, ignore Wartungsart filter
+    if(!f.installationsOnly && f.jobs.length && !f.jobs.includes(j.jobType)) return false;
+
+    if(f.techs.length){
+      const techBucket = (j.technicianName || 'Unknown');
+      if(!f.techs.includes(techBucket)) return false;
+    }
+
+    if(f.regions.length && !f.regions.includes(j.regionId||'Unknown')) return false;
+
+    if(f.installationsOnly){
+      if(f.from && j.dueDate < f.from) return false;
+      if(f.to   && j.dueDate > f.to) return false;
+      return true;
+    }
+
+    // Overdue-only mode: ignore date range entirely, show only red
+    if(f.overdueOnly){
+      return j.status === 'red';
+    }
+
+    // Otherwise: keep overdue regardless of From/To; apply range to non-overdue only
+    if(f.from && j.dueDate < f.from && j.status !== 'red') return false;
+    if(f.to   && j.dueDate > f.to) return false;
+
+    return true;
+  });
+}
+
+
+function renderPlannerSummary(rows, isInstall){
+  const s = document.getElementById('pl-summary');
+  s.innerHTML = '';
+
+  // Unique locations = unique customerIds in the filtered rows
+  const locations = new Set(rows.map(r => r.customerId).filter(v => v != null && v !== '')).size;
+
+  if (isInstall){
+    s.innerHTML = `
+      <div class="chip">Installations <b>${rows.length}</b></div>
+      <div class="chip">Total locations <b>${locations}</b></div>
+    `;
+    return;
+  }
+
+  const total = rows.length;
+  const red   = rows.filter(r => r.status === 'red').length;
+  const pink  = rows.filter(r => r.status === 'pink').length;
+  const green = rows.filter(r => r.status === 'green').length;
+
+  s.innerHTML = `
+    <div class="chip">Jobs <b>${total}</b></div>
+    <div class="chip"><span class="legend-dot dot-red"></span>Overdue <b>${red}</b></div>
+    <div class="chip"><span class="legend-dot dot-pink"></span>0–3 months <b>${pink}</b></div>
+    <div class="chip"><span class="legend-dot dot-green"></span>> 3 months <b>${green}</b></div>
+    <div class="chip">Total locations <b>${locations}</b></div>
+  `;
+}
+
+function renderPlannerTable(rows){
+  const c=document.getElementById('plannerTable');
+  if(!rows.length){ c.innerHTML='<p class="text-muted">No jobs for selected filters.</p>'; return; }
+  const colgroup = '<colgroup>' + plannerColWidths.map(w=> `<col style="width:${w}px">`).join('') + '</colgroup>';
+  let html = `
+  <table class="table table-sm align-middle" style="table-layout:fixed;width:100%">
+    ${colgroup}
+    <thead class="table-light">
+      <tr>
+        <th>Wartungsart</th>
+        <th>Date</th>
+        <th>Region</th>
+        <th>Customer Code</th>
+  <th>Customer Name</th>
+  <th>City</th>
+  <th>Tank Inv_Nr.</th>
+  <th>Technician</th>
+  <th>Object</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  rows.forEach(r=>{
+    const cls = r.status==='red' ? 'row-red' : (r.status==='pink'? 'row-pink':'row-green');
+    const dateStr = formatMonth(r.dueDate);
+    html += `
+      <tr class="${cls}" style="cursor:pointer" onclick="openDetails('${r.customerId}')">
+        <td><span class="status-pill ${r.status==='red'?'pill-red':(r.status==='pink'?'pill-pink':'pill-green')}">${r.jobType}</span></td>
+        <td>${dateStr}</td>
+  <td>${r.regionName || 'Unknown'}</td>
+        <td>${r.customerCode || ''}</td>
+  <td>${r.customerName || ''}</td>
+  <td>${r.customerCity || ''}</td>
+        <td>${r.tankInv || ''}</td>
+        <td>${r.technicianName || 'Unknown'}</td>
+        <td>${r.label} <span class="text-muted">(${r.objectType})</span></td>
+      </tr>`;
+  });
+
+  html += `
+    </tbody>
+  </table>`;
+  c.innerHTML = html;
+  // enable column resize grips
+  enablePlannerColumnResize(c);
+}
+
+// Helper: find the earliest WKP Anlage due date related to a planner row
+function findWkpAnlageForRow(r){
+  const tgtTank = r.tankId;
+  let best = null;
+  (window.plannerJobs || []).forEach(j => {
+    if (j.jobType === 'wkP Anlage' && (j.tankId === tgtTank || (!tgtTank && j.customerId === r.customerId))){
+      if (!best || j.dueDate < best) best = j.dueDate;
+    }
+  });
+  return best;
+}
+
+let plannerMarkersGroup = null; // keep this at file scope
+function renderPlannerMap(rows){
+  ensurePlannerMap();
+
+  // Remove previous group (this clears ALL old markers in one go)
+  if (plannerMarkersGroup) {
+    try { plannerMap.removeLayer(plannerMarkersGroup); } catch(e){}
+    plannerMarkersGroup = null;
+  }
+
+  // Create a fresh group for this render
+  plannerMarkersGroup = L.layerGroup().addTo(plannerMap);
+
+  const markers = [];
+  rows.forEach(r => {
+    if (typeof r.lat === 'number' && typeof r.lon === 'number') {
+      const dot = makeDotMarker(r.lat, r.lon, r.status);
+      const dateStr = formatMonth(r.dueDate);
+      const wkpDate = findWkpAnlageForRow(r);
+      const wkpStr  = wkpDate ? formatMonth(wkpDate) : '—';
+      const popup = `
+        <div style="min-width:220px">
+          <div><strong>${escapeHtml(r.jobType)}</strong> ${dateStr}</div>
+          <div>WKP Anlage: <strong>${wkpStr}</strong></div>
+          <div>${escapeHtml(r.regionName || 'Unknown')} • ${escapeHtml(r.customerCode || '')}${r.customerName ? ' • ' + escapeHtml(r.customerName) : ''}</div>
+          <div>Tank Inv: <strong>${escapeHtml(r.tankInv || '')}</strong></div>
+          <div>Technician: <strong>${escapeHtml(r.technicianName || 'Unknown')}</strong></div>
+          <div style="margin-top:6px">${escapeHtml(r.label)} <span class="text-muted">(${escapeHtml(r.objectType)})</span></div>
+          <button class="btn btn-sm btn-primary mt-2" onclick="openDetails('${r.customerId}')">Details</button>
+        </div>`;
+      dot.bindPopup(popup);
+      plannerMarkersGroup.addLayer(dot);
+      markers.push(dot);
+    }
+  });
+
+  // Fit to current selection only
+  try {
+    if (markers.length) {
+      const group = L.featureGroup(markers);
+      plannerMap.fitBounds(group.getBounds().pad(0.5));
+    }
+  } catch(e) {}
+
+  // No direct m.addTo(plannerMap) anywhere in this function
+}
+
+/* Planner column resize state and helper */
+let plannerColWidths = [140,100,130,140,200,140,160,160,260];
+//  Wartungsart, Date, Region, Cust Code, Cust Name, City, Tank Inv, Technician, Object
+
+function enablePlannerColumnResize(container){
+  const table = container.querySelector('table'); if(!table) return;
+  const colgroup = table.querySelector('colgroup');
+  const cols = colgroup ? colgroup.querySelectorAll('col') : null;
+  const ths = table.querySelectorAll('thead th');
+
+  ths.forEach((th,idx)=>{
+    const grip = document.createElement('div');
+    grip.className='planner-col-resizer';
+    th.appendChild(grip);
+
+    grip.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = plannerColWidths[idx] || th.offsetWidth;
+
+      function onMove(ev){
+        const w = Math.max(80, startW + (ev.clientX - startX));
+        plannerColWidths[idx] = w;
+        if(cols && cols[idx]) cols[idx].style.width = w + 'px';
+      }
+      function onUp(){
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
+/* --- Planner filters population --- */
+let plannerFiltersPopulated = false;
+function fillPlannerFiltersFromData(){
+  // Regions
+  const regionSel = document.getElementById('pl-regions');
+  regionSel.innerHTML = '';
+  const seenRegions = new Set();
+  Object.entries(plannerRegionName || {}).forEach(([rid,rname])=>{
+    if(!rid || seenRegions.has(rid)) return;
+    seenRegions.add(rid);
+    const opt = document.createElement('option');
+    opt.value = rid;
+    opt.textContent = rname || rid;
+    regionSel.appendChild(opt);
+  });
+
+  // Technicians — use real names appearing in current data
+  const techSel = document.getElementById('pl-techs');
+  techSel.innerHTML = '';
+  const names = new Set();
+  (plannerJobs || []).forEach(j => names.add(j.technicianName || 'Unknown'));
+  (plannerInstallations || []).forEach(j => names.add(j.technicianName || 'Unknown'));
+  const arr = Array.from(names).sort((a,b)=> a.localeCompare(b));
+  arr.forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    techSel.appendChild(opt);
+  });
+
+  plannerFiltersPopulated = true;
+}
+
+/* --- Helpers to set default month range --- */
+function setThisQuarter(){
+  const now = new Date();
+  const from = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const toDate = new Date(now.getFullYear(), now.getMonth()+3, 1); // first day of month +3
+  const to = `${toDate.getFullYear()}-${String(toDate.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('pl-from').value = from;
+  document.getElementById('pl-to').value = to; // getPlannerFilters() already converts to end-of-month
+}
+
+
+/* --- Debounce --- */
+function debounce(fn, ms){
+  let t=null;
+  return function(...args){
+    clearTimeout(t);
+    t=setTimeout(()=> fn.apply(this,args), ms);
+  };
+}
+
+/* --- Update view --- */
+const updatePlannerView = debounce(function(){
+  // ensure datasets built
+  if((!plannerJobs || !plannerJobs.length) && (!plannerInstallations || !plannerInstallations.length)) return;
+  const f = getPlannerFilters();
+  // disable controls irrelevant in installations-only mode
+  const overdueEl = document.getElementById('pl-overdue-only'); if(overdueEl) overdueEl.disabled = !!f.installationsOnly;
+  const jobsEl = document.getElementById('pl-jobs'); if(jobsEl) jobsEl.disabled = !!f.installationsOnly;
+  const sortKey = document.getElementById('pl-sort-key')?.value || 'dueDate';
+  const sortDir = document.getElementById('pl-sort-dir')?.value || 'asc';
+  const source = f.installationsOnly ? plannerInstallations : plannerJobs;
+  const rows = filterJobs(source, f);
+
+  rows.sort((a,b)=>{
+    let A = a[sortKey], B = b[sortKey];
+    if (sortKey === 'dueDate'){ A = a.dueDate?.getTime()||0; B = b.dueDate?.getTime()||0; }
+    else { A = (A??'').toString().toLowerCase(); B = (B??'').toString().toLowerCase(); }
+    return (sortDir==='asc') ? (A<B?-1:A>B?1:0) : (A<B?1:A>B?-1:0);
+  });
+
+  renderPlannerSummary(rows, f.installationsOnly);
+  renderPlannerTable(rows);
+  renderPlannerMap(rows);
+}, 60);
+
+/* --- Tab lifecycle --- */
+function onPlannerTabShown(){
+  ensurePlannerMap();
+  // Build jobs fresh each time (sheet could be re-uploaded)
+  buildPlannerJobs();
+  buildInstallationJobs();
+  // populate filters once and render
+  if(!plannerFiltersPopulated) fillPlannerFiltersFromData();
+  updatePlannerView();
+
+  document.getElementById('pl-clear').addEventListener('click', ()=>{
+    // Clear months and checkbox; leave default selections in Object Types & Jobs as defined in markup
+    document.getElementById('pl-from').value = '';
+    document.getElementById('pl-to').value = '';
+    document.getElementById('pl-overdue-only').checked = false;
+    // Clear Regions and Technicians selections
+    Array.from(document.getElementById('pl-techs').options).forEach(o=> o.selected=false);
+    Array.from(document.getElementById('pl-regions').options).forEach(o=> o.selected=false);
+    updatePlannerView();
+  });
+
+  document.getElementById('pl-today').addEventListener('click', ()=>{
+    setThisQuarter();
+    document.getElementById('pl-overdue-only').checked = false;
+  document.getElementById('pl-installations-only').checked = false;
+    // Keep default selections in types/jobs; clear techs/regions to "all"
+    Array.from(document.getElementById('pl-techs').options).forEach(o=> o.selected=false);
+    Array.from(document.getElementById('pl-regions').options).forEach(o=> o.selected=false);
+    updatePlannerView();
+  });
+}
+
+/* ====================== REPORTS / EXPORT HELPERS ====================== */
+async function exportElementToPDF(elementId, filename){
+  try{
+    const el = document.getElementById(elementId);
+    if(!el) return alert('Nothing to export.');
+
+    // Apply compact PDF styles just for rendering
+    el.classList.add('pdf-export');
+    await new Promise(r => setTimeout(r, 50)); // allow layout to settle
+
+    // High-res render of the (now compact) panel
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      windowWidth: el.scrollWidth,
+      windowHeight: el.scrollHeight
+    });
+
+    // Remove the temporary class
+    el.classList.remove('pdf-export');
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+
+    // Page metrics
+    const pageW = pdf.internal.pageSize.getWidth();   // 210mm
+    const pageH = pdf.internal.pageSize.getHeight();  // 297mm
+    const margin = 10;                                // 10mm margin
+    const usableW = pageW - margin*2;
+    const usableH = pageH - margin*2;
+
+    // ===== AUTO-FIT to MAX_PAGES =====
+    const MAX_PAGES = 2; // user-requested target
+  const MIN_IMG_W_MM = 70; // keep text comfortably legible
+
+    // Solve for image width (mm) that would achieve ~MAX_PAGES:
+    // totalPages ≈ ceil( canvas.height / (usableH * (canvas.width / imgWmm)) )
+    // => imgWmm ≈ (MAX_PAGES * usableH * canvas.width) / canvas.height
+    let targetImgWmm = (MAX_PAGES * usableH * canvas.width) / canvas.height;
+    // Clamp into a sensible range
+    let imgWmm = Math.min(usableW, Math.max(MIN_IMG_W_MM, Math.round(targetImgWmm)));
+
+    // Compute pixels-per-mm and pages for chosen width
+    let pxPerMm = canvas.width / imgWmm;
+    let pageHPx = Math.floor(usableH * pxPerMm);
+    let totalPages = Math.max(1, Math.ceil(canvas.height / pageHPx));
+
+    // If we still exceed MAX_PAGES, try stepping down imgWmm iteratively (10% steps) until min or budget met
+    let tries = 0;
+    while(totalPages > MAX_PAGES && imgWmm > MIN_IMG_W_MM && tries < 10){
+      imgWmm = Math.max(MIN_IMG_W_MM, Math.floor(imgWmm * 0.85));
+      pxPerMm = canvas.width / imgWmm;
+      pageHPx = Math.floor(usableH * pxPerMm);
+      totalPages = Math.max(1, Math.ceil(canvas.height / pageHPx));
+      tries++;
+    }
+
+    if(totalPages > MAX_PAGES){
+      console.warn(`exportElementToPDF: unable to fit content into ${MAX_PAGES} pages; producing ${totalPages} pages. Consider reducing content or increasing MAX_PAGES.`);
+    }
+    const title = 'Statistics Report';
+    const ts = new Date().toLocaleString();
+    const exportedBy = (document.getElementById('username') && document.getElementById('username').value) || window.loggedInUser || window.currentUserName || 'Unknown';
+
+    for(let p=0; p<totalPages; p++){
+      if(p>0) pdf.addPage();
+
+      // HEADER
+      pdf.setFont('helvetica','normal');
+      pdf.setFontSize(11);
+      pdf.setTextColor(20);
+      pdf.text(title, margin, 8);
+      pdf.setFontSize(10);
+      pdf.text(ts, pageW - margin, 8, { align: 'right' });
+
+      // Slice the big canvas into page-high strips
+      const sY = p * pageHPx;
+      const sH = Math.min(pageHPx, canvas.height - sY);
+
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sH;
+
+      const ctx = pageCanvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+      ctx.drawImage(canvas, 0, sY, canvas.width, sH, 0, 0, canvas.width, sH);
+
+  const imgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+  const imgHmm = sH / pxPerMm; // height in mm for this slice
+
+  // Center image horizontally if narrower than usableW
+  const x = margin + Math.max(0, (usableW - imgWmm) / 2);
+
+  // place image slice inside margins (leave 10mm top for header)
+  pdf.addImage(imgData, 'JPEG', x, 10, imgWmm, imgHmm, undefined, 'FAST');
+
+      // FOOTER
+      pdf.setFontSize(9);
+      pdf.setTextColor(100);
+      pdf.text(`Exported by: ${exportedBy}`, margin, pageH - 6);
+      pdf.text(`Page ${p+1} of ${totalPages}`, pageW - margin, pageH - 6, { align: 'right' });
+    }
+
+    // Save
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    pdf.save(filename || `Statistics_Report_${stamp}.pdf`);
+  }catch(e){
+    console.warn('PDF export failed', e);
+    alert('PDF export failed.');
+  }
+}
+
+async function exportStatisticsPDF(){
+  const src = document.getElementById('statsPanel');
+  if(!src){ alert('Statistics panel not found.'); return; }
+
+  // Build a clean, print-friendly clone
+  const wrapper = document.createElement('div');
+  wrapper.className = 'pdf-friendly';
+  const clone = src.cloneNode(true);
+
+  // Mark typical “cards” as avoid-break to prevent slicing mid-widget
+  clone.querySelectorAll('.card,.stat-card,.tile').forEach(el => el.classList.add('avoid-break'));
+
+  // Optional: insert a simple title block at top of the clone (lives inside the content area)
+  const title = document.createElement('div');
+  title.style.margin = '0 12px 8px 12px';
+  // Attempt to show project logo (logo.png preferred, fallback to logo.svg) inside the title block.
+  // We will also try to convert the image to a dataURL and draw it in the PDF header on every page.
+  async function loadImageData(src){
+    return new Promise((res)=>{
+      try{
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function(){
+          try{
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth || img.width;
+            c.height = img.naturalHeight || img.height;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img,0,0);
+            const data = c.toDataURL('image/png');
+            res({ dataUrl: data, width: c.width, height: c.height });
+          }catch(e){ res(null); }
+        };
+        img.onerror = function(){ res(null); };
+        img.src = src;
+      }catch(e){ res(null); }
+    });
+  }
+
+  // Try png first, then svg
+  let logoInfo = await loadImageData('logo.png');
+  if(!logoInfo) logoInfo = await loadImageData('logo.svg');
+
+  // Who exported this? prefer the login field, fallback to a global var or 'Unknown User'
+  const exportedBy = (document.getElementById('username') && document.getElementById('username').value) ? document.getElementById('username').value : (window.currentUserName || 'Unknown User');
+  const generatedAt = new Date();
+  const generatedAtStr = generatedAt.toLocaleString();
+
+  if(logoInfo && logoInfo.dataUrl){
+    title.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between"><div style=\"font-size:18px;font-weight:700;\">Statistics Report</div><div style=\"flex:0 0 auto;\"><img src=\"${logoInfo.dataUrl}\" style=\"height:36px;display:block;\"/></div></div><div style=\"font-size:11px;color:#374151;margin-top:6px;\">Generated: ${generatedAtStr} &middot; Exported by: ${escapeHtml(exportedBy)}</div>`;
+  }else{
+    title.innerHTML = `<div style="font-size:18px;font-weight:700;">Statistics Report</div>\n                     <div style="font-size:11px;color:#374151;">Generated: ${generatedAtStr} &middot; Exported by: ${escapeHtml(exportedBy)}</div>`;
+  }
+  wrapper.appendChild(title);
+
+  const body = document.createElement('div');
+  body.style.margin = '0 12px';
+  body.appendChild(clone);
+  wrapper.appendChild(body);
+
+  // Use jsPDF HTML renderer (handles pagination + our CSS).
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p','mm','a4');
+
+  // Content margins (leave space top/bottom for header/footer drawing)
+  const margin = { top: 28, right: 14, bottom: 18, left: 14 };
+
+  await doc.html(wrapper, {
+    x: margin.left,
+    y: margin.top,
+    width: doc.internal.pageSize.getWidth() - margin.left - margin.right,
+    windowWidth: 1200,
+    autoPaging: 'text',
+    html2canvas: { scale: 2, scrollY: 0 },
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['.avoid-break'], before: '.page-break' }
+  });
+
+  // After content is laid out, draw header/footer on every page.
+  const pages = doc.getNumberOfPages();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  // Use the previously computed generatedAtStr and exportedBy for consistency
+  const dateStr = generatedAtStr || new Date().toLocaleString();
+
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+
+  // Header
+    // Draw logo (if loaded) on each page header at left, then draw the title and timestamp
+    if(logoInfo && logoInfo.dataUrl){
+      try{
+        const logoWidthMm = 24; // desired logo width in mm
+        const logoHeightMm = Math.max(6, Math.round((logoInfo.height / logoInfo.width) * logoWidthMm));
+        doc.addImage(logoInfo.dataUrl, 'PNG', margin.left, 6, logoWidthMm, logoHeightMm);
+        // shift title right a little when logo present
+        const titleX = margin.left + logoWidthMm + 4;
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(17,24,39);
+        doc.text('Statistics Report', titleX, 12);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(55,65,81);
+  doc.text(dateStr, pageW - margin.right, 12, { align: 'right' });
+  // show exporter on the next line in smaller type
+  try{ doc.setFontSize(9); doc.setTextColor(75,85,99); doc.text(`Exported by: ${exportedBy}`, pageW - margin.right, 18, { align: 'right' }); }catch(e){}
+      }catch(e){
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(17,24,39);
+        doc.text('Statistics Report', 14, 12);
+        doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(55,65,81);
+        doc.text(dateStr, pageW - 14, 12, { align: 'right' });
+      }
+    }else{
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(17,24,39);
+      doc.text('Statistics Report', 14, 12);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(55,65,81);
+  doc.text(dateStr, pageW - 14, 12, { align: 'right' });
+  try{ doc.setFontSize(9); doc.setTextColor(75,85,99); doc.text(`Exported by: ${exportedBy}`, pageW - 14, 18, { align: 'right' }); }catch(e){}
+    }
+
+    // Header rule
+    doc.setDrawColor(229,231,235); doc.setLineWidth(0.3);
+    doc.line(12, 14, pageW - 12, 14);
+
+    // Footer: page numbers centered
+    doc.line(12, pageH - 14, pageW - 12, pageH - 14);
+    doc.setFontSize(10); doc.setTextColor(75,85,99);
+    doc.text(`Page ${i} of ${pages}`, pageW/2, pageH - 8, { align: 'center' });
+  }
+
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  doc.save(`Statistics_Report_${stamp}.pdf`);
+}
+
+document.getElementById('exportStatsBtn')?.addEventListener('click', () => exportElementToPDF('statsPanel','Statistics_Report.pdf'));
+document.getElementById('generatePdfBtn')?.addEventListener('click', ()=> exportElementToPDF('tab-planner','Planner.pdf'));
+document.getElementById('exportPlannerBtn')?.addEventListener('click', ()=> exportElementToPDF('tab-planner','Planner.pdf'));
+document.getElementById('exportDetailsBtn')?.addEventListener('click', ()=> exportElementToPDF('detailsPanel','Details.pdf'));
+
+function exportPlannerTableDomToExcel(){
+  const table = document.querySelector('#plannerTable table');
+  if(!table){ alert('No Planner table to export.'); return; }
+
+  const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+  const bodyRows = Array.from(table.querySelectorAll('tbody tr'));
+  const dataRows = bodyRows.map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent.replace(/\s+/g,' ').trim()));
+
+  if (dataRows.length === 0){ alert('No rows to export for current filters.'); return; }
+
+  const aoa = [headers, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  ws['!cols'] = headers.map((h,i)=>{
+    const maxLen = Math.max(h.length, ...(dataRows.map(r=> (r[i] ? String(r[i]).length : 0))));
+    return { wch: Math.min(Math.max(maxLen + 2, 10), 60) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  const isInstall = document.getElementById('pl-installations-only')?.checked || false;
+  XLSX.utils.book_append_sheet(wb, ws, isInstall ? 'Installations' : 'Jobs');
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const filename = `Planner_${isInstall ? 'Installations' : 'Jobs'}_${stamp}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+document.getElementById('exportPlannerExcelBtn')?.addEventListener('click', exportPlannerTableDomToExcel);
+
+// Hide pool card by default
+(function hidePoolCardInitially(){
+  try{ const card = document.querySelector('#poolPreview')?.closest('.card'); if(card) card.style.display='none'; }catch(e){}
+})();
+
+function showPoolCard(show){
+  try{ const card = document.querySelector('#poolPreview')?.closest('.card'); if(card) card.style.display = show ? 'block' : 'none'; }catch(e){}
+}
+
+</script>
+</body>
+</html>
