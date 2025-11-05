@@ -1321,9 +1321,10 @@ function updateCustomerMap(customerIds){
         <button class="btn btn-sm btn-primary mt-2" onclick="openDetails('${cid}')">Details</button>
       </div>`;
 
-  const m = makeDotMarker(lat, lon, customerStatusTag(cid)).bindPopup(html);
-    customerMarkersGroup.addLayer(m);
-    markers.push(m);
+    const tag = customerStatusTag(cid); // overdue/urgent/planned
+    const dot = makeDotMarker(lat, lon, tag).bindPopup(html);
+    customerMarkersGroup.addLayer(dot);
+    markers.push(dot);
   });
 
   fitBoundsIfAny(customerMap, customerMarkersGroup);
@@ -1665,10 +1666,10 @@ function updateMaintenance(customerIds){
     (appData.tanks[cid]||[]).forEach(t=>{
       rows.push({ customer:cid, id:t.id, next_date:t.next_date, status:t.status, technician:t.technician_name || t.technician_id || 'Unknown' });
       if(typeof t.latitude==='number' && typeof t.longitude==='number'){
-  const popup = `Tank ${t.id}<br/>Next:${t.next_date||''}<br/>Status:${t.status||''}`;
-  const m = makeDotMarker(t.latitude, t.longitude, t.status).bindPopup(popup);
-        maintenanceMarkersGroup.addLayer(m);
-        markers.push(m);
+        const popup = `Tank ${t.id}<br/>Next:${t.next_date||''}<br/>Status:${t.status||''}`;
+        const dot = makeDotMarker(t.latitude, t.longitude, t.status).bindPopup(popup);
+        maintenanceMarkersGroup.addLayer(dot);
+        markers.push(dot);
       }
     });
   });
